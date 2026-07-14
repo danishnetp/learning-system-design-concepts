@@ -1,0 +1,94 @@
+@startuml PostApiSolutionParallelFlow
+
+title Idempotent POST Solution - Flow Diagram (Parallel / Race Condition Case)
+
+skinparam backgroundColor #FAFAFA
+skinparam ArrowColor #555555
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+skinparam ActivityBorderColor #333333
+skinparam ActivityBackgroundColor #DDEEFF
+skinparam ActivityDiamondBackgroundColor #FFF2CC
+skinparam ActivityDiamondBorderColor #F9A825
+skinparam ActivityStartColor #4CAF50
+skinparam ActivityEndColor #F44336
+skinparam PartitionBackgroundColor #FFF8E1
+skinparam PartitionBorderColor #F9A825
+
+start
+
+:Same user submits POST /orders\nfrom Browser Tab 1 and Tab 2\nwith same Idempotency-Key: abc123;
+
+:Step 1: Both threads pass header validation\nIdempotency-Key: abc123 present in request;
+
+note right
+  Both Tab 1 and Tab 2 arrive
+  at the critical section simultaneously.
+  Without a lock, both would insert
+  duplicate keys causing duplicates.
+end note
+
+partition "** Critical Section (Mutex Lock) **" {
+
+  #FFE6CC:Step 2: Thread tries to ACQUIRE MUTEX LOCK\n(ReentrantLock / synchronized block);
+
+  note right
+    Only ONE thread enters at a time.
+    The other thread BLOCKS here
+    and waits until lock is released.
+  end note
+
+  :Step 3: INSERT into Idempotency Key Store\nidempotency_key = abc123\nstatus = CREATED\n(UNIQUE constraint on key);
+
+  note right
+    DB UNIQUE constraint acts as
+    a second safety net in case
+    two threads bypass the lock.
+  end note
+
+  #FFE6CC:Step 4: RELEASE MUTEX LOCK\nNext waiting thread may now enter;
+
+}
+
+if (Step 5: Was INSERT successful?) then (YES - Tab 1 wins)
+
+  :Step 6: Key entry created in Key Store\nstatus = CREATED;
+
+  :Step 7: Execute business logic\nINSERT order into Orders DB\n(item=A, qty=1);
+
+  if (Order INSERT succeeded?) then (YES)
+    :Step 8: Update Key Store\nstatus = CONSUMED\nstored_response = {order_id: 501, code: 201};
+    #D5E8D4:Step 9: Return HTTP 201 Created\n{order_id: 501};
+  else (NO)
+    :Step 8: Delete or expire idempotency key\n(rollback key claim);
+    #F8CECC:Step 9: Return HTTP 500 Internal Server Error;
+    stop
+  endif
+
+else (NO - Tab 2 hits UNIQUE constraint violation)
+
+  :Step 6: Read existing key status\nfrom Key Store;
+
+  if (Key status?) then (CREATED - still in progress)
+    #F8CECC:Step 7: Return HTTP 409 Conflict\n{error: "Request already in progress,\nplease retry shortly"};
+    stop
+  else (CONSUMED - Tab 1 already finished)
+    :Step 7: Retrieve cached response\nfrom Key Store;
+    #D5E8D4:Step 8: Return HTTP 200 OK\n{order_id: 501}\n(same cached response);
+  endif
+
+endif
+
+:RESULT: Only ONE order created\nIdempotency preserved;
+
+note right
+  Tab 1 - HTTP 201 Created (order_id=501)
+  Tab 2 - HTTP 409 Conflict
+         OR HTTP 200 OK if retried after Tab 1 finishes
+  No duplicate orders created!
+end note
+
+stop
+
+@enduml
+

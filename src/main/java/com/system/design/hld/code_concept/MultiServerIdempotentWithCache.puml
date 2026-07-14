@@ -1,0 +1,166 @@
+@startuml MultiServerIdempotentWithCache
+
+title Idempotent POST - Multi-Server Setup with Replication Lag\nSolution: Distributed Cache (Redis) for Fast Key Replication
+
+skinparam backgroundColor #FAFAFA
+skinparam ArrowColor #555555
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+skinparam SequenceGroupBackgroundColor #F3F9FF
+skinparam SequenceGroupBorderColor #4A90D9
+skinparam SequenceBoxBackgroundColor #EEF7EE
+skinparam SequenceBoxBorderColor #5A9E5A
+
+autonumber
+
+actor "Client" as client
+participant "Load Balancer" as lb
+
+box "Server Cluster" #EEF7EE
+  participant "App Server 1" as s1
+  participant "App Server 2" as s2
+  participant "App Server 3" as s3
+end box
+
+box "Shared Distributed Cache" #FFF8E1
+  database "Redis Cache\n(Primary)" as redisPrimary
+  database "Redis Replica 1" as redisReplica1
+  database "Redis Replica 2" as redisReplica2
+end box
+
+box "Independent Databases (per server)" #F3F9FF
+  database "DB 1\n(Server 1)" as db1
+  database "DB 2\n(Server 2)" as db2
+  database "DB 3\n(Server 3)" as db3
+end box
+
+' ─────────────────────────────────────────
+== PROBLEM CONTEXT: DB Replication Lag ==
+' ─────────────────────────────────────────
+
+note over db1, db3
+  Each server has its own DB.
+  DB replication is ASYNC and can lag by seconds/minutes.
+  If Server 1 writes to DB1, Server 2 may not see it yet.
+  This breaks idempotency when retry hits a different server!
+end note
+
+' ─────────────────────────────────────────
+== FIRST REQUEST: Client sends POST (hits Server 1) ==
+' ─────────────────────────────────────────
+
+client -> lb : POST /orders\nIdempotency-Key: uuid-abc123\n(body: item=A, qty=1)
+lb -> s1 : Route to Server 1
+
+s1 -> s1 : Validate Idempotency-Key header present
+
+note right of s1
+  Step 1: Check CACHE first (not DB).
+  Cache replication is near-instant
+  across all Redis nodes (<1ms).
+end note
+
+s1 -> redisPrimary : GET idempotency:uuid-abc123
+redisPrimary -> s1 : NIL (key not found)
+
+s1 -> redisPrimary : SET idempotency:uuid-abc123\nstatus=CREATED\nEX 86400 (TTL: 24h)\n[ATOMIC SETNX]
+
+note right of redisPrimary
+  SETNX = SET if Not eXists
+  Atomic operation - prevents
+  race condition at cache level.
+end note
+
+redisPrimary -> s1 : OK
+
+s1 -> db1 : INSERT order\n(item=A, qty=1)
+db1 -> s1 : OK (order_id=601)
+
+s1 -> redisPrimary : SET idempotency:uuid-abc123\nstatus=CONSUMED\nresponse={order_id:601, code:201}\nEX 86400
+
+redisPrimary -> s1 : OK
+
+s1 -> client : HTTP 201 Created\n{order_id: 601}
+
+' ─────────────────────────────────────────
+== CACHE REPLICATION (near-instant) ==
+' ─────────────────────────────────────────
+
+redisPrimary ->> redisReplica1 : ASYNC REPLICATE\nidempotency:uuid-abc123\nstatus=CONSUMED
+redisPrimary ->> redisReplica2 : ASYNC REPLICATE\nidempotency:uuid-abc123\nstatus=CONSUMED
+
+note over redisPrimary, redisReplica2
+  Redis replication lag: <1ms (sub-millisecond).
+  All replicas are updated almost instantly.
+  Contrast with DB replication: can lag seconds/minutes.
+end note
+
+' ─────────────────────────────────────────
+== DB REPLICATION (slow, async background) ==
+' ─────────────────────────────────────────
+
+db1 ->> db2 : ASYNC DB REPLICATION\n(can lag seconds to minutes)
+db1 ->> db3 : ASYNC DB REPLICATION\n(can lag seconds to minutes)
+
+note over db1, db3 #F8CECC
+  WARNING: DB replication has NOT completed yet.
+  If retry hits Server 2 or 3 and checks DB directly,
+  they would see NO record and process DUPLICATE order!
+  This is why we MUST check cache, not DB.
+end note
+
+' ─────────────────────────────────────────
+== RETRY REQUEST: Same client retries (hits Server 2) ==
+' ─────────────────────────────────────────
+
+client -> lb : POST /orders\nIdempotency-Key: uuid-abc123\n(body: item=A, qty=1)
+lb -> s2 : Route to Server 2 (different server!)
+
+s2 -> s2 : Validate Idempotency-Key header present
+
+note right of s2
+  Server 2 has NO knowledge of Server 1's processing.
+  DB replication may still be in progress.
+  Server 2 reads from Redis Replica (near-instant sync).
+end note
+
+s2 -> redisReplica1 : GET idempotency:uuid-abc123
+redisReplica1 -> s2 : HIT! status=CONSUMED\nresponse={order_id:601, code:201}
+
+s2 -> s2 : Key found + status=CONSUMED\nReturn cached response directly\nSkip DB entirely
+
+s2 -> client : HTTP 200 OK\n{order_id: 601}\n(cached response — no duplicate created!)
+
+note right of s2 #D5E8D4
+  SUCCESS: Idempotency preserved!
+  Server 2 did NOT touch DB2 at all.
+  No duplicate order created.
+  Cache was the source of truth.
+end note
+
+' ─────────────────────────────────────────
+== PARALLEL CASE: Third request hits Server 3 during processing ==
+' ─────────────────────────────────────────
+
+group Bonus: Concurrent request during CREATED state
+  client -> lb : POST /orders\nIdempotency-Key: uuid-abc123
+  lb -> s3 : Route to Server 3
+  s3 -> redisReplica2 : GET idempotency:uuid-abc123
+  redisReplica2 -> s3 : HIT! status=CREATED\n(still processing on Server 1)
+  s3 -> client : HTTP 409 Conflict\n{error: "Request already in progress,\nretry after a moment"}
+end group
+
+' ─────────────────────────────────────────
+
+note over client, db3
+  KEY DESIGN DECISIONS:
+  1. Always check Redis cache BEFORE touching any DB
+  2. Use Redis SETNX (atomic SET if Not eXists) to prevent race at cache level
+  3. Cache TTL = 24h (matches idempotency window)
+  4. status=CREATED  -> 409 Conflict (in-flight protection)
+  5. status=CONSUMED -> 200 OK      (replay cached response)
+  6. DB replication is irrelevant for idempotency — cache is the authority
+end note
+
+@enduml
+

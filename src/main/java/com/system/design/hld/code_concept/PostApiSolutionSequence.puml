@@ -1,0 +1,94 @@
+@startuml PostApiSolutionSequence
+
+title Idempotent POST Solution - Sequence Case (Proper Idempotency Key Handling)
+
+skinparam backgroundColor #FAFAFA
+skinparam ArrowColor #555555
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+autonumber
+
+actor "Client" as client
+participant "API Service" as api
+database "Idempotency\nKey Store" as keyStore
+database "Orders DB" as db
+
+== Step 1-2: Client prepares request ==
+client -> client : Generate Idempotent Key\n(UUID v4)\ne.g., abc-123-def-456
+client -> api : POST /orders\nIdempotency-Key: abc-123-def-456\n(body: item=A, qty=1)
+
+== Step 3: Server validates header ==
+api -> api : Check if Idempotency-Key\nheader present?
+alt Idempotency-Key Header NOT present
+  api -> client : HTTP 400 Bad Request\n{error: "Idempotency-Key header required"}
+  note right of api
+    Step 4: Request validation FAILED!
+    Missing required header.
+    Operation aborted.
+  end note
+else Idempotency-Key Header present ✓
+  api -> api : Header validation passed
+  note right of api
+    Continue to Step 5
+  end note
+end
+
+== Step 5: Server reads key from DB ==
+api -> keyStore : SELECT * WHERE\nidempotency_key = 'abc-123-def-456'
+keyStore -> api : NOT FOUND (First request)
+
+== Step 6: First request - NEW KEY ==
+api -> keyStore : INSERT idempotency_key entry\nstatus = 'CREATED'
+keyStore -> api : OK
+
+== Step 7: Execute business logic ==
+api -> db : INSERT order (item=A, qty=1)
+db -> api : OK (order_id=401)
+
+== Step 8: Update key status to CONSUMED ==
+api -> keyStore : UPDATE status = 'CONSUMED'\nstored_response = {order_id:401, status:201}
+keyStore -> api : OK
+
+== Step 9: Return response ==
+api -> client : HTTP 201 Created\n{order_id: 401}
+
+note right of keyStore
+Entry in DB:
+{
+  idempotency_key: 'abc-123-def-456',
+  status: 'CONSUMED',
+  response_body: {order_id: 401},
+  status_code: 201,
+  created_at: timestamp
+}
+end note
+
+== Step 10: Retry - Same request within TTL ==
+client -> api : POST /orders\nIdempotency-Key: abc-123-def-456\n(body: item=A, qty=1)
+
+== Step 11: Server validates header (again) ==
+api -> api : Idempotency-Key present ✓
+
+== Step 12: Server reads key from DB ==
+api -> keyStore : SELECT * WHERE\nidempotency_key = 'abc-123-def-456'
+keyStore -> api : FOUND (status=CONSUMED)
+
+== Step 13: Key exists - check status ==
+api -> api : Check key status
+api -> api : Status = 'CONSUMED' ✓
+
+== Step 14: Return cached response ==
+api -> keyStore : Retrieve cached response\nfor idempotency_key
+keyStore -> api : {order_id: 401, status: 201}
+api -> client : HTTP 200 OK\n{order_id: 401}\n(cached response)
+
+note right of api
+Result: Idempotency maintained!
+Same response returned for
+duplicate request with same UUID.
+No duplicate order created.
+end note
+
+@enduml
+

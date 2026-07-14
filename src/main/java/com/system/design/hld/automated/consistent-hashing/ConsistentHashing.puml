@@ -1,0 +1,71 @@
+@startuml ConsistentHashing
+
+title High-Level Design: Consistent Hashing
+
+skinparam backgroundColor #FAFAFA
+skinparam componentStyle rectangle
+
+' ─── Hash Ring ───
+note as ring
+  **Hash Ring (Virtual Nodes)**
+
+  The hash ring spans 0 → 2^32 - 1 (circular)
+
+        0
+        │
+  270 ──┼── 90           Servers mapped to ring:
+        │                • Server A @ positions 30, 150, 270
+       180               • Server B @ positions 60, 180, 330
+                         • Server C @ positions 90, 210, 30
+
+  Keys are hashed to a position on the ring.
+  Request is served by the FIRST server clockwise
+  from the key's position.
+
+  Virtual Nodes (vnodes):
+  Each physical server maps to multiple positions
+  (e.g. 150 vnodes each) for uniform distribution.
+end note
+
+' ─── Component View ───
+component "Client /\nRequest Router" as client #DDEEFF
+
+package "Cache / DB Cluster" {
+    node "Server A\n(vnodes: 30,150,270)" as sa #D5E8D4
+    node "Server B\n(vnodes: 60,180,330)" as sb #D5E8D4
+    node "Server C\n(vnodes: 90,210,30)"  as sc #D5E8D4
+}
+
+component "Consistent Hash\nRouter Library" as chr #FFF2CC
+
+client --> chr : hash(key) → ring position
+chr --> sa : keys mapping to A's range
+chr --> sb : keys mapping to B's range
+chr --> sc : keys mapping to C's range
+
+note right of chr
+  **Adding a new server D:**
+  Only keys between D's predecessor
+  and D's position are remapped.
+  ≈ 1/N of total keys (minimal disruption)
+
+  **Removing a server:**
+  Its keys move to the next server clockwise.
+  Only that server's keys are affected.
+
+  **Without consistent hashing:**
+  Adding/removing a node remaps
+  ALL keys → thundering herd on DB.
+end note
+
+note bottom of sa
+  **Real-world uses:**
+  • Amazon DynamoDB / Dynamo paper
+  • Apache Cassandra (token ring)
+  • Memcached client libraries
+  • CDN edge server selection
+  • Distributed load balancers
+end note
+
+@enduml
+

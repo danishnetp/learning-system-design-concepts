@@ -1,0 +1,100 @@
+@startuml MultiServerIdempotentIssue
+
+title Idempotent POST Issue - Multi-Server Case\nIndependent DBs + Slow Replication Cause Duplicate Processing
+
+skinparam backgroundColor #FAFAFA
+skinparam ArrowColor #555555
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+skinparam SequenceGroupBackgroundColor #F3F9FF
+skinparam SequenceGroupBorderColor #4A90D9
+skinparam SequenceBoxBackgroundColor #EEF7EE
+skinparam SequenceBoxBorderColor #5A9E5A
+
+autonumber
+
+actor "Client" as client
+participant "Load Balancer" as lb
+
+box "Server Cluster" #EEF7EE
+  participant "App Server 1" as s1
+  participant "App Server 2" as s2
+end box
+
+box "Independent Databases" #F3F9FF
+  database "DB 1\n(Server 1)" as db1
+  database "DB 2\n(Server 2)" as db2
+end box
+
+== Problem Context ==
+note over s1, db2
+  Each application server writes to its own database.
+  Database replication is asynchronous and can be delayed.
+  If the retry lands on another server before replication completes,
+  that server may not know the request was already processed.
+end note
+
+== Request #1 hits Server 1 ==
+client -> lb : POST /orders\nIdempotency-Key: uuid-abc123\n(body: item=A, qty=1)
+lb -> s1 : Route request to Server 1
+
+s1 -> s1 : Validate Idempotency-Key header present
+s1 -> db1 : CHECK idempotency_key = uuid-abc123
+db1 --> s1 : NOT FOUND
+
+s1 -> db1 : INSERT idempotency_key = uuid-abc123\nstatus = CREATED
+s1 -> db1 : INSERT order\n(item=A, qty=1)
+db1 --> s1 : OK (order_id=701)
+s1 -> db1 : UPDATE idempotency_key\nstatus = CONSUMED\nresponse = {order_id:701}
+
+note right of s1
+  Server 1 has processed the request successfully.
+  But only DB1 knows this right now.
+end note
+
+... network timeout / client did not receive response ...
+
+== DB Replication is still pending ==
+db1 ->> db2 : ASYNC REPLICATION\n(can lag seconds or minutes)
+
+note over db1, db2 #F8CECC
+  Replication has NOT completed yet.
+  DB2 still does not have:
+  - idempotency key uuid-abc123
+  - order_id=701
+end note
+
+== Retry hits Server 2 ==
+client -> lb : POST /orders\nIdempotency-Key: uuid-abc123\n(body: item=A, qty=1)
+lb -> s2 : Route retry to Server 2
+
+s2 -> s2 : Validate Idempotency-Key header present
+s2 -> db2 : CHECK idempotency_key = uuid-abc123
+db2 --> s2 : NOT FOUND
+
+note right of s2 #F8CECC
+  Server 2 incorrectly assumes this is a new request
+  because DB2 has not received replication from DB1 yet.
+end note
+
+s2 -> db2 : INSERT idempotency_key = uuid-abc123\nstatus = CREATED
+s2 -> db2 : INSERT order\n(item=A, qty=1)
+db2 --> s2 : OK (order_id=702)
+s2 -> db2 : UPDATE idempotency_key\nstatus = CONSUMED\nresponse = {order_id:702}
+s2 -> client : HTTP 201 Created\n{order_id: 702}
+
+== Duplicate Outcome ==
+note over client, db2 #F8CECC
+  ISSUE:
+  Same logical request was processed twice.
+
+  Server 1 created order_id=701 in DB1.
+  Server 2 created order_id=702 in DB2.
+
+  Root Cause:
+  Idempotency state stored only in per-server DBs
+  with slow asynchronous replication.
+end note
+
+@enduml
+

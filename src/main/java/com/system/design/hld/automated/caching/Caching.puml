@@ -1,0 +1,81 @@
+@startuml Caching
+
+title High-Level Design: Caching Strategies
+
+skinparam backgroundColor #FAFAFA
+skinparam componentStyle rectangle
+
+actor "Client" as client
+
+component "Application\nService" as app #D5E8D4
+
+component "Cache\n(Redis / Memcached)" as cache #FFF2CC {
+    storage "In-Memory\nKey-Value Store" as kv
+}
+
+database "Primary\nDatabase" as db #DDEEFF
+
+' ─── Cache-Aside (Lazy Loading) ───
+note as n1
+  **1. Cache-Aside (Lazy Loading)**
+  READ:
+    1. Check cache → HIT → return data
+    2. MISS → read DB → populate cache → return
+  WRITE:
+    Invalidate / update cache after DB write
+end note
+
+' ─── Write-Through ───
+note as n2
+  **2. Write-Through**
+  WRITE:
+    Write to cache AND DB synchronously.
+  PRO: cache always consistent
+  CON: write latency increases
+end note
+
+' ─── Write-Back (Write-Behind) ───
+note as n3
+  **3. Write-Back**
+  WRITE:
+    Write to cache only → async flush to DB.
+  PRO: low write latency
+  CON: risk of data loss on crash
+end note
+
+' ─── Read-Through ───
+note as n4
+  **4. Read-Through**
+  Cache sits in-line; on MISS cache
+  fetches from DB itself.
+end note
+
+client --> app   : Request
+app    --> cache : 1. Cache lookup
+cache  --> app   : HIT → cached data
+app    --> db    : MISS → DB query
+db     --> app   : DB result
+app    --> cache : Populate cache (TTL)
+app    --> client : Response
+
+note right of cache
+  **Eviction Policies:**
+  • LRU – Least Recently Used
+  • LFU – Least Frequently Used
+  • FIFO – First In First Out
+  • TTL – Time To Live expiry
+
+  **Cache Problems:**
+  • Cache Stampede (dog-piling)
+  • Cache Penetration (non-existent keys)
+  • Cache Avalanche (mass expiry)
+  • Thundering Herd
+end note
+
+note bottom of db
+  Always the source of truth.
+  Cache is a performance layer only.
+end note
+
+@enduml
+

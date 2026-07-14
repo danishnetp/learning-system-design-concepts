@@ -107,6 +107,31 @@ learning-system-design-concepts/
 ./gradlew test
 ```
 
+## High-Level Design (HLD) Topics
+
+Design diagrams live under `src/main/java/com/system/design/hld/`.
+Each topic contains a **PlantUML** (`.puml`) and/or **draw.io** (`.drawio`) diagram.
+
+| Folder | Topic | Key Concepts |
+|---|---|---|
+| `hld/` | **HLD-Overview** | Master map of all topics |
+| `hld/idempodent/` | **Idempotency** | Idempotency keys, duplicate detection, TTL |
+| `hld/load-balancing/` | **Load Balancing** | Round Robin, Least Conn, IP Hash, health checks |
+| `hld/caching/` | **Caching** | Cache-Aside, Write-Through, Write-Back, LRU/LFU |
+| `hld/rate-limiting/` | **Rate Limiting** | Token Bucket, Leaky Bucket, Sliding Window |
+| `hld/message-queue/` | **Message Queue** | Pub/Sub, Kafka, RabbitMQ, DLQ, At-least-once |
+| `hld/database-sharding/` | **DB Sharding** | Hash/Range/Directory sharding, replication |
+| `hld/api-gateway/` | **API Gateway** | Auth, routing, SSL termination, aggregation |
+| `hld/circuit-breaker/` | **Circuit Breaker** | CLOSED/OPEN/HALF-OPEN states, Resilience4j |
+| `hld/consistent-hashing/` | **Consistent Hashing** | Hash ring, virtual nodes, minimal remapping |
+
+### Rendering Diagrams
+
+- **PlantUML** (`.puml`) — install the *PlantUML Integration* plugin in IntelliJ for live preview
+- **draw.io** (`.drawio`) — install the *Diagrams.net Integration* plugin in IntelliJ to open visually
+
+Plugin recommendations are saved in `.idea/externalDependencies.xml` — IntelliJ will prompt you to install them automatically.
+
 ## License
 
 This project is for learning purposes.

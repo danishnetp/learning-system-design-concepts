@@ -1,0 +1,89 @@
+@startuml PostApiSolutionParallel
+
+title Idempotent POST Solution - Parallel Request Case (Atomic Key Claim)
+
+skinparam backgroundColor #FAFAFA
+skinparam ArrowColor #555555
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+autonumber
+
+actor "Browser Tab 1" as tab1
+actor "Browser Tab 2" as tab2
+participant "API Service" as api
+database "Idempotency\nKey Store" as keyStore
+database "Orders DB" as db
+
+== Same User sends same request with same UUID from 2 browser tabs ==
+par Tab 1: POST with UUID=abc123
+  tab1 -> api : POST /orders\nIdempotency-Key: abc123\n(body: item=A, qty=1)
+  api -> api : Check header present
+else Tab 2: POST with UUID=abc123
+  tab2 -> api : POST /orders\nIdempotency-Key: abc123\n(body: item=A, qty=1)
+  api -> api : Check header present
+end
+
+note right of api
+Both requests have same Idempotency-Key.
+Now using ATOMIC operations to prevent
+duplicates despite race condition.
+end note
+
+== CRITICAL SECTION: Acquire Lock before key insert ==
+note over api
+  Mutex Lock / Synchronized Block
+  Only ONE thread allowed at a time.
+  Other threads WAIT at the lock boundary.
+end note
+
+api -> api : ACQUIRE LOCK\n(ReentrantLock / synchronized block\nor DB SELECT FOR UPDATE)
+
+note right of api
+  Thread safety:
+  Tab 1 acquires lock first.
+  Tab 2 blocks and waits.
+end note
+
+par Tab 1 Claim (lock owner)
+  api -> keyStore : INSERT idempotency_key=abc123\nstatus='CREATED'\n(UNIQUE constraint)
+  keyStore -> api : OK - Key claimed by Tab 1
+  api -> api : RELEASE LOCK\n(Tab 2 now unblocked)
+else Tab 2 Claim (was blocked, now enters)
+  api -> keyStore : INSERT idempotency_key=abc123\nstatus='CREATED'\n(UNIQUE constraint)
+  keyStore -> api : CONSTRAINT VIOLATION\n(Key already exists!)
+  api -> api : RELEASE LOCK
+end
+
+note right of keyStore
+  Two-layer protection:
+  1. Mutex Lock: serializes thread access
+  2. DB UNIQUE constraint: final safety net
+  Only ONE request can insert the key.
+end note
+
+== Tab 1: Process (key owner) ==
+api -> db : INSERT order (item=A, qty=1)
+db -> api : OK (order_id=501)
+api -> keyStore : UPDATE status='CONSUMED'\nstored_response={order_id:501, code:201}
+keyStore -> api : OK
+api -> tab1 : HTTP 201 Created\n{order_id: 501}
+
+== Tab 2: Handle conflict ==
+api -> keyStore : SELECT status WHERE\nidempotency_key=abc123
+keyStore -> api : status='CREATED'\n(still processing)
+api -> tab2 : HTTP 409 Conflict\nor wait/retry with exponential backoff
+
+note bottom
+OUTCOME:
+Tab 1: Gets order_id=501
+Tab 2: Gets HTTP 409 Conflict (request rejected)
+OR Tab 2 can retry and get cached response
+once Tab 1 marks status='CONSUMED'
+
+Result: No duplicate order created!
+Only one order exists.
+end note
+
+@enduml
+

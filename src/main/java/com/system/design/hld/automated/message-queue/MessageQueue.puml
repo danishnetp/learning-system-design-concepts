@@ -1,0 +1,76 @@
+@startuml MessageQueue
+
+title High-Level Design: Message Queue / Async Messaging
+
+skinparam backgroundColor #FAFAFA
+skinparam componentStyle rectangle
+
+' ─── Producers ───
+package "Producers" {
+    component [Order Service] as prod1 #D5E8D4
+    component [Payment Service] as prod2 #D5E8D4
+    component [User Service] as prod3 #D5E8D4
+}
+
+' ─── Message Broker ───
+rectangle "Message Broker\n(Kafka / RabbitMQ / SQS)" as broker #DDEEFF {
+    queue "Topic / Queue\norder.created" as q1
+    queue "Topic / Queue\npayment.processed" as q2
+    queue "Dead Letter\nQueue (DLQ)" as dlq
+}
+
+' ─── Consumers ───
+package "Consumers (Consumer Groups)" {
+    component [Notification Service] as con1 #FFF2CC
+    component [Inventory Service]    as con2 #FFF2CC
+    component [Analytics Service]    as con3 #FFF2CC
+    component [DLQ Processor /\nAlert Service] as con4 #F8CECC
+}
+
+database "Consumer\nOffset Store" as offset #EEE
+
+' ─── Flow ───
+prod1 --> q1 : publish order.created
+prod2 --> q2 : publish payment.processed
+prod3 --> q1 : publish user.registered
+
+q1 --> con1 : subscribe (push/pull)
+q1 --> con2 : subscribe
+q2 --> con3 : subscribe
+
+q1 --> dlq  : retry exhausted → DLQ
+q2 --> dlq  : retry exhausted → DLQ
+dlq --> con4 : manual / alert processing
+
+con1 --> offset : commit offset
+con2 --> offset : commit offset
+con3 --> offset : commit offset
+
+note right of broker
+  **Patterns:**
+  • Point-to-Point (Queue) — one consumer
+  • Pub/Sub (Topic)        — many consumers
+  • Competing Consumers    — scale out consumers
+  • Fan-out                — copy to multiple queues
+
+  **Guarantees:**
+  • At-most-once  delivery (may lose)
+  • At-least-once delivery (may duplicate)
+  • Exactly-once  delivery (hardest, Kafka txns)
+end note
+
+note right of dlq
+  **Dead Letter Queue:**
+  Messages that fail after N retries
+  are moved here for investigation.
+  Prevents poison-pill blocking.
+end note
+
+note bottom of offset
+  Kafka: consumers track their own
+  offset per partition.
+  Allows independent replay / rewind.
+end note
+
+@enduml
+

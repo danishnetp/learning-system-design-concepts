@@ -1,0 +1,85 @@
+@startuml MultiServerIdempotentWithCacheFlow
+
+title Idempotent POST Solution - Multi-Server Flow Diagram\nUse Distributed Cache to Avoid Duplicate Processing
+
+skinparam backgroundColor #FAFAFA
+skinparam ArrowColor #555555
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+skinparam ActivityBorderColor #333333
+skinparam ActivityBackgroundColor #DDEEFF
+skinparam ActivityDiamondBackgroundColor #FFF2CC
+skinparam ActivityDiamondBorderColor #F9A825
+skinparam ActivityStartColor #4CAF50
+skinparam ActivityEndColor #F44336
+
+start
+
+:Client sends POST /orders\nIdempotency-Key: uuid-abc123;
+
+:Load Balancer routes request\nto any app server;
+
+:Server validates\nIdempotency-Key header;
+
+if (Header present?) then (NO)
+  #F8CECC:Return HTTP 400 Bad Request;
+  stop
+else (YES)
+endif
+
+:Server checks shared Redis cache\nfor idempotency key;
+
+if (Key found in cache?) then (YES)
+  if (Status = CREATED?) then (YES)
+    #F8CECC:Return HTTP 409 Conflict\nrequest already in progress;
+    stop
+  else (NO - Status = CONSUMED)
+    :Read cached response\nfrom Redis;
+    #D5E8D4:Return HTTP 200 OK\nwith cached response;
+    stop
+  endif
+else (NO)
+endif
+
+:Atomically claim key in Redis\nusing SETNX;
+
+if (SETNX success?) then (NO)
+  :Another server claimed the key first;
+  :Read current status from cache;
+  if (Status = CREATED?) then (YES)
+    #F8CECC:Return HTTP 409 Conflict;
+    stop
+  else (NO - Status = CONSUMED)
+    :Read cached response;
+    #D5E8D4:Return HTTP 200 OK;
+    stop
+  endif
+else (YES)
+endif
+
+:Write status = CREATED\ninto Redis with TTL;
+:Process business logic\nand insert order into local DB;
+
+if (Order creation succeeded?) then (NO)
+  :Delete/expire cache key\nor mark as failed;
+  #F8CECC:Return HTTP 500 Internal Server Error;
+  stop
+else (YES)
+endif
+
+:Update Redis key\nstatus = CONSUMED;
+:Store response in Redis\nfor replay;
+
+note right
+  Redis replication is much faster
+  than DB replication.
+  All servers can see idempotency state quickly,
+  even when their local DBs are out of sync.
+end note
+
+#D5E8D4:Return HTTP 201 Created;
+
+stop
+
+@enduml
+
