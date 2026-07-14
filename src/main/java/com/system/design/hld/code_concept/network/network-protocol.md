@@ -31,7 +31,43 @@ Typical flow:
 - state management or stateless interaction
 
 ### Interview point
-If asked “How does a protocol work?”, explain it from the client request, transport, server parsing, processing, and response lifecycle.
+If asked "How does a protocol work?", answer with a short, repeatable structure:
+
+1. **Role:** What problem the protocol solves.
+2. **Connection model:** Request/response, persistent bidirectional, or peer-to-peer.
+3. **Message flow:** Handshake, message format, processing, and response/ack.
+4. **Reliability behavior:** Retries, ordering, idempotency, timeouts, and failure handling.
+5. **Best-fit use case:** When to use it and when not to.
+
+#### Example answer template
+"`<Protocol>` is used for `<purpose>`. It uses `<connection model>`. A typical flow is `<step 1> -> <step 2> -> <step 3>`. For reliability, it handles `<key behavior>`. I would choose it for `<use case>` but avoid it when `<limitation>` matters."
+
+#### Example 1: HTTP (client-server API)
+- **Role:** Standard protocol for web/mobile APIs.
+- **Connection model:** Stateless request/response.
+- **Flow:** Client sends method + URL + headers + optional body; server validates, processes, and returns status + body.
+- **Reliability details:** Client retries safe/idempotent operations carefully; use timeouts, backoff, and idempotency keys for create APIs.
+- **Use case:** CRUD APIs, service integration.
+
+#### Example 2: WebSocket (real-time updates)
+- **Role:** Low-latency two-way communication.
+- **Connection model:** Persistent full-duplex channel after HTTP upgrade.
+- **Flow:** Handshake -> upgrade -> both client and server push messages anytime.
+- **Reliability details:** Handle reconnect, heartbeat/ping, and message ordering/duplication rules at app level.
+- **Use case:** Chat, notifications, live dashboards.
+
+#### Example 3: WebRTC (peer-to-peer media)
+- **Role:** Real-time peer media/data exchange.
+- **Connection model:** Peer-to-peer (with signaling + ICE setup).
+- **Flow:** Offer/answer signaling -> ICE candidate exchange -> direct media path (or TURN relay fallback).
+- **Reliability details:** NAT/firewall traversal, adaptive bitrate, fallback to relay when direct path fails.
+- **Use case:** Video calls, voice calls, real-time collaboration media.
+
+#### Common interview mistakes to avoid
+- Explaining only definitions without message flow.
+- Ignoring failure behavior (timeouts, retries, reconnects).
+- Not stating tradeoffs or best-fit scenario.
+- Mixing protocol purpose (for example, SMTP send vs IMAP/POP read).
 
 ---
 
@@ -210,4 +246,3 @@ In architecture interviews, choose the protocol based on the workload:
 - **WebRTC** for direct real-time peer communication
 
 The main interview goal is to show that you understand not just the protocol name, but also the connection model, reliability tradeoffs, and when each protocol fits the system design.
-
