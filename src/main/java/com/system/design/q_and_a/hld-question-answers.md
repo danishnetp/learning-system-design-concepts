@@ -13,6 +13,7 @@ Topics covered:
 - Consistent Hashing
 - Idempotency
 - Network Protocols
+- CAP Theorem
 
 ---
 
@@ -388,6 +389,7 @@ Start with requirements, estimate scale, identify bottlenecks, design the happy 
 - Use **SMTP** for sending email
 - Use **FTP** for legacy file transfer
 - Use **WebRTC** for peer-to-peer real-time media
+- Use **CAP Theorem** to explain consistency vs availability decisions under partition
 
 ---
 
@@ -460,7 +462,80 @@ You should mention the communication model, persistence, directionality, latency
 
 ---
 
-## 14) Closing Guidance
+## 14) CAP Theorem
+
+### Q1. What is CAP Theorem in simple terms?
+**Answer:**
+CAP says that in a distributed data system, during a network partition, you can prioritize at most one of:
+- **Consistency (C):** all clients see the same latest value
+- **Availability (A):** every request receives a non-error response
+
+Partition tolerance is generally mandatory in real distributed systems.
+
+### Q2. Why is partition tolerance treated as non-negotiable?
+**Answer:**
+Because network splits, packet loss, or inter-zone connectivity failures happen in production. A distributed system must define behavior for those failures, so the practical decision is usually CP vs AP under partition.
+
+### Q3. What is a CP system behavior during partition?
+**Answer:**
+CP systems preserve correctness by rejecting/delaying operations that cannot meet consistency guarantees.
+
+Example:
+- payment or inventory systems often reject writes in isolated partitions rather than risk conflicting updates.
+
+### Q4. What is an AP system behavior during partition?
+**Answer:**
+AP systems preserve responsiveness by continuing to serve requests from available replicas, then reconciling later.
+
+Example:
+- social feed, likes, and analytics counters can accept temporary inconsistency.
+
+### Q5. Is CA possible?
+**Answer:**
+Only in environments where partition is not part of the model (for example single-node setups). In real distributed deployments, partition can occur, so CAP tradeoffs must be designed explicitly.
+
+### Q6. How do you decide CP vs AP in interviews?
+**Answer:**
+Use business criticality:
+- choose CP when wrong data is unacceptable (money, stock, identity state)
+- choose AP when temporary staleness is acceptable but uptime/latency is critical (feeds, dashboards, recommendations)
+
+### Q7. What techniques support CP design?
+**Answer:**
+- leader-based writes
+- synchronous replication
+- read/write quorum
+- reject-on-uncertain-state behavior
+
+### Q8. What techniques support AP design?
+**Answer:**
+- async replication
+- eventual consistency
+- conflict resolution rules
+- idempotency + retries + reconciliation jobs
+
+### Q9. How does CAP relate to microservices?
+**Answer:**
+Different endpoints can adopt different CAP bias.
+
+Example:
+- `/payments/authorize` can be CP-leaning
+- `/profile/badge` can be AP-leaning with cached fallback
+
+### Q10. What are common CAP misconceptions?
+**Answer:**
+- CAP is about behavior under partition, not only normal operation.
+- CAP availability is not the same as SLA uptime percentage.
+- CAP consistency is distributed visibility correctness, not only ACID wording.
+- Modern systems often mix CP/AP per workflow.
+
+### Q11. What is a strong one-liner answer for CAP in interviews?
+**Answer:**
+"I assume partition is inevitable, then choose CP or AP per workflow based on business risk, and add controls like quorum, idempotency, retries, and reconciliation to make that tradeoff safe."
+
+---
+
+## 15) Closing Guidance
 
 In HLD interviews, the strongest answers do not just name components; they explain:
 - why the component exists,

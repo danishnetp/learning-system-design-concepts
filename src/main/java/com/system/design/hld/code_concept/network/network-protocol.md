@@ -437,3 +437,40 @@ In architecture interviews, choose the protocol based on the workload:
 - **IP/ICMP** for routing fundamentals and network diagnostics
 
 The main interview goal is to show that you understand not just the protocol name, but also the connection model, reliability tradeoffs, and when each protocol fits the system design.
+
+---
+
+## 9) One-Page Protocol Comparison (Interview Quick Sheet)
+
+### 9.1 Side-by-side comparison
+| Protocol | Layer | Communication model | Connection style | Reliability model | Typical latency profile | Best fit | Common limitation |
+|---|---|---|---|---|---|---|---|
+| HTTP | Application | Client-server request/response | Usually short-lived per request (can reuse via keep-alive) | Depends on transport (typically TCP/QUIC) + app retries | Low to medium | APIs, CRUD, service integration | Polling overhead for real-time push if not using streaming/WebSocket |
+| FTP | Application | Client-server file transfer | Control channel + separate data channel | Transfer-oriented, operational retry/checksum patterns | Medium to high (file-size dependent) | Legacy/batch file movement | Plain FTP is insecure; NAT/firewall handling can be tricky |
+| SMTP | Application | Client-to-server and server-to-server relay | Session-based command exchange | Queue + retry + bounce semantics | Medium (store-and-forward) | Outbound email delivery | Not for mailbox retrieval (use IMAP/POP3) |
+| WebSocket | Application | Full-duplex client-server messaging | Long-lived persistent connection (after HTTP upgrade) | App-level reconnect, heartbeat, ordering/dup handling | Low | Chat, live dashboards, collaborative apps | Requires connection lifecycle management and scaling strategy |
+| WebRTC | Application + media stack | Peer-to-peer media/data (with signaling) | Session-oriented peer connection | ICE/STUN/TURN path selection + adaptive media controls | Very low for direct P2P; higher via relay | Video/voice calls, real-time media | NAT/firewall traversal complexity, TURN relay cost |
+
+### 9.2 Interview-focused differences
+| Dimension | HTTP | WebSocket | WebRTC | SMTP | FTP |
+|---|---|---|---|---|---|
+| Real-time bidirectional | Limited (needs polling/streaming tricks) | Yes | Yes | No | No |
+| Message semantics | Request/response | Event/message stream | Media + data channels | Email command/relay | File commands/transfer |
+| Stateful vs stateless usage | Mostly stateless API style | Stateful connection | Stateful session | Stateful mail transfer sessions | Stateful transfer sessions |
+| Typical reliability strategy | Idempotency + retries + status codes | Reconnect + heartbeat + replay logic | Jitter control + bitrate adapt + relay fallback | Queue/retry/bounce handling | Resume/checksum/retry |
+| Security baseline | TLS (`https`) | TLS (`wss`) | DTLS/SRTP in stack + secure signaling | TLS where configured | Prefer SFTP/FTPS over plain FTP |
+
+### 9.3 One-liner answers to memorize
+- **HTTP:** "Best for standard APIs where request/response and broad ecosystem support matter most."
+- **WebSocket:** "Best for low-latency bidirectional updates without repeated polling overhead."
+- **WebRTC:** "Best for direct real-time media between peers, with TURN fallback when direct paths fail."
+- **SMTP:** "Best for reliable email sending via store-and-forward relay and retry behavior."
+- **FTP:** "Best for legacy file transfer workflows, but modern secure alternatives are usually preferred."
+
+### 9.4 Quick protocol picker
+- Need CRUD API and broad compatibility -> **HTTP**
+- Need instant server push/chat/live events -> **WebSocket**
+- Need audio/video calls -> **WebRTC**
+- Need outbound emails -> **SMTP**
+- Need legacy partner file exchange -> **FTP** (or preferably SFTP/HTTPS alternatives)
+
