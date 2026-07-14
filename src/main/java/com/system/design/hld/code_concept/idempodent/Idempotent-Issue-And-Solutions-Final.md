@@ -3,21 +3,6 @@
 ## Scope and Source
 This final document consolidates idempotency issues and solutions from the `idempodent` concept artifacts.
 
-> Note: No `.md` source files were present in this folder. This summary is derived from all `.puml` files in:
-`src/main/java/com/system/design/hld/code_concept/idempodent`
-
-Covered diagrams:
-- `PostApiIssueSequence.puml`
-- `PostApiIssueParallel.puml`
-- `MultiServerIdempotentIssue.puml`
-- `MultiServerIdempotentIssueFlow.puml`
-- `PostApiSolutionSequence.puml`
-- `PostApiSolutionSequenceFlow.puml`
-- `PostApiSolutionParallel.puml`
-- `PostApiSolutionParallelFlow.puml`
-- `MultiServerIdempotentWithCache.puml`
-- `MultiServerIdempotentWithCacheFlow.puml`
-
 ## Problem Statement
 A `POST /orders` request may be processed multiple times for the same user intent when:
 - the client retries after timeout,
@@ -177,3 +162,14 @@ The complete fix is:
 
 With this design, the same business intent is processed exactly once, even with retries, parallel submits, and cross-server routing.
 
+Covered diagrams:
+- `PostApiIssueSequence.puml`
+- `PostApiIssueParallel.puml`
+- `MultiServerIdempotentIssue.puml`
+- `MultiServerIdempotentIssueFlow.puml`
+- `PostApiSolutionSequence.puml`
+- `PostApiSolutionSequenceFlow.puml`
+- `PostApiSolutionParallel.puml`
+- `PostApiSolutionParallelFlow.puml`
+- `MultiServerIdempotentWithCache.puml`
+- `MultiServerIdempotentWithCacheFlow.puml`
