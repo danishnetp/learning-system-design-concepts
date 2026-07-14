@@ -15,6 +15,7 @@ Topics covered:
 - Network Protocols
 - CAP Theorem
 - Monolithic vs Microservices
+- Eventual Consistency
 
 ---
 
@@ -392,6 +393,7 @@ Start with requirements, estimate scale, identify bottlenecks, design the happy 
 - Use **WebRTC** for peer-to-peer real-time media
 - Use **CAP Theorem** to explain consistency vs availability decisions under partition
 - Use **Monolith vs Microservices** tradeoffs based on team size, scale, and operational maturity
+- Use **Eventual Consistency** to accept short-lived staleness in exchange for availability and low latency
 
 ---
 
@@ -609,7 +611,81 @@ Use incremental strangler pattern migration: modularize monolith, extract high-v
 
 ---
 
-## 16) Closing Guidance
+## 16) Eventual Consistency
+
+### Q1. What is eventual consistency?
+**Answer:**
+Eventual consistency is a model where all replicas of a data item will converge to the same value once no new updates are made. It guarantees convergence, not immediacy.
+
+### Q2. How does eventual consistency differ from strong consistency?
+**Answer:**
+- **Strong consistency:** every read always returns the latest write, at the cost of higher latency and coordination overhead.
+- **Eventual consistency:** reads may return stale data during replication lag but the system stays available and low-latency.
+
+### Q3. What causes staleness in eventual consistency?
+**Answer:**
+Asynchronous replication lag — a write reaches the primary, but replicas have not yet received the update. A read hitting a replica returns the previous value.
+
+### Q4. What is the read-your-own-write (RYOW) problem?
+**Answer:**
+A user writes data and immediately reads from a stale replica, not seeing their own update. Mitigations include routing user reads to the same node, using version-based reads, or using quorum reads.
+
+### Q5. How are write conflicts resolved in eventually consistent systems?
+**Answer:**
+Common strategies:
+- **Last Write Wins (LWW):** highest timestamp wins — simple but risks data loss from clock skew.
+- **CRDTs:** data structures designed for deterministic conflict-free merge (G-Counter, OR-Set).
+- **MVCC:** keep multiple versions, surface conflict to application for resolution.
+- **Application-level merge:** business logic decides the winning value.
+
+### Q6. What is a CRDT and when should you use it?
+**Answer:**
+A Conflict-Free Replicated Data Type is a data structure where concurrent updates from any replica can be merged deterministically without conflict. Use CRDTs for counters, sets, or registers where concurrent modification from multiple nodes must not lose data (for example shopping cart, collaborative text, like counts).
+
+### Q7. What is the Outbox Pattern?
+**Answer:**
+The Outbox Pattern solves the dual-write problem. A service writes a business record and an event to an outbox table in one local DB transaction, then a relay process publishes the event asynchronously. This guarantees at-least-once delivery without a distributed transaction.
+
+### Q8. What is the Saga Pattern?
+**Answer:**
+A Saga breaks a long-running cross-service transaction into a sequence of local transactions, each followed by a compensating action on failure.
+- **Choreography Saga:** services react to events and emit next events.
+- **Orchestration Saga:** a central orchestrator drives each step.
+
+### Q9. What is Change Data Capture (CDC) and how does it help?
+**Answer:**
+CDC captures DB change events from the transaction log (for example Debezium on Postgres WAL). Downstream services consume these events without the application emitting them explicitly. It is useful for replication, projections, and cross-service eventual consistency.
+
+### Q10. When should you NOT use eventual consistency?
+**Answer:**
+Avoid eventual consistency for:
+- payment authorization and ledger balances
+- inventory reservation at checkout (oversell risk)
+- auth token revocation (security-critical reads)
+- any place where stale data causes financial, compliance, or safety risk
+
+### Q11. How do you monitor eventual consistency in production?
+**Answer:**
+- track replication lag as a metric with alerting
+- measure stale-read ratio where possible
+- monitor conflict/merge rate in AP stores
+- set convergence time SLOs and alert when breached
+
+### Q12. Name real-world systems that use eventual consistency.
+**Answer:**
+- Amazon DynamoDB (default eventually consistent reads)
+- Apache Cassandra (tunable; default eventually)
+- Redis replication (async to replicas)
+- Amazon S3 (strong since 2020; was eventual for overwrites)
+- Apache CouchDB (multi-master eventual with MVCC)
+
+### Q13. What is the one-liner for eventual consistency in interviews?
+**Answer:**
+"Eventual consistency accepts short-lived staleness to gain availability and low latency; systems converge after replication, and we use CRDTs, LWW, outbox, or saga patterns to make that safe and predictable in production."
+
+---
+
+## 17) Closing Guidance
 
 In HLD interviews, the strongest answers do not just name components; they explain:
 - why the component exists,
