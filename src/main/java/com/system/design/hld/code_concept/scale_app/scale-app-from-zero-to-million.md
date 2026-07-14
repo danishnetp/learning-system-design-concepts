@@ -209,10 +209,46 @@ Client (geo-distributed)
 
 ---
 
-## Stage 7: Database Sharding
+## Stage 7: Database Scaling
 
 ### Architecture
-Data is horizontally partitioned across multiple DB shards. Each shard holds a subset of the data (for example by user_id range or hash).
+At this stage, database capacity becomes the core bottleneck. We scale databases in two ways:
+
+1. **Vertical Scaling (Scale Up)**
+2. **Horizontal Scaling (Scale Out / Sharding)**
+
+#### Vertical Scaling
+Increase CPU, RAM, storage IOPS on a single DB server.
+
+Advantages:
+- simpler architecture changes
+- no shard router required
+- no cross-shard join logic
+
+Limitations:
+- hard upper limit of machine size
+- high-end hardware is expensive
+- single-node dependency still exists
+
+#### Horizontal Scaling
+Distribute data across multiple DB nodes so storage and throughput grow with node count.
+
+Advantages:
+- scales writes and storage beyond one machine
+- better long-term growth for millions of users
+
+Limitations:
+- routing complexity
+- harder joins/transactions across shards
+- shard key and rebalance strategy become critical
+
+---
+
+### Define Sharding
+
+#### a) Horizontal sharding (row wise)
+Split by rows using a shard key (for example `user_id`, `tenant_id`, region).
+Each shard has the same schema, but different row subsets.
 
 ```
 App Servers
@@ -225,14 +261,41 @@ App Servers
 (user 0-33%) (34-66%) (67-100%)
 ```
 
-### What this solves
-- Write throughput and storage can scale beyond a single DB node
-- Each shard is smaller and faster to query
+#### b) Vertical sharding (column wise / domain wise)
+Split by column groups or domain ownership into separate databases.
 
-### Tradeoffs
-- Cross-shard queries are complex or not possible
-- Choosing the right shard key is critical (hot shard risk)
-- Schema changes must be coordinated across all shards
+Example:
+- `UserCore DB`: user_id, email, phone
+- `UserProfile DB`: user_id, bio, preferences
+- `Billing DB`: user_id, payment artifacts
+
+### What this solves
+- write throughput and storage can scale beyond a single DB node
+- reduces single-node DB bottlenecks for very large datasets
+- allows independent scaling strategies for different data domains
+
+### Drawbacks of Sharding (important)
+
+#### a) Hot-user concentration (same user -> same shard)
+If shard key is `user_id`, one very active user/tenant can generate disproportionate traffic and all their records land on one shard.
+
+Impact:
+- hotspot shard
+- uneven load
+- may require re-sharding or key redesign
+
+#### b) Join query complexity
+Cross-shard joins are difficult, expensive, or unsupported.
+
+Impact:
+- app-side aggregation logic increases
+- higher query latency
+- reporting complexity rises
+
+### Additional tradeoffs
+- choosing the right shard key is critical (hot shard risk)
+- schema changes must be coordinated across shards
+- rebalancing/migration is operationally complex
 
 ---
 
@@ -486,7 +549,7 @@ Key -> Hash Ring -> Node Assignment
 | 4     | DB read replicas                      | Tens of thousands               | Read-heavy DB bottleneck                  |
 | 5     | Caching layer                         | Hundreds of thousands           | Hot-data DB read reduction                |
 | 6     | CDN for static assets                 | Any scale                       | Static asset bandwidth, geo latency       |
-| 7     | DB sharding                           | Millions                        | Write throughput, storage limits          |
+| 7     | Database scaling (vertical + horizontal/sharding) | Millions                        | DB capacity ceiling, write/storage limits |
 | 8     | Microservices + queues                | Millions+                       | Domain scale, async offload               |
 | 9     | Multi-data center deployment          | Millions+ (global)              | Regional resilience, geo latency          |
 | 10    | Consistent hashing                    | Millions+                       | Stable partitioning during scale events   |
@@ -503,7 +566,7 @@ When asked "How would you scale this from zero to millions?", use this structure
 4. Add DB read replicas (read scale, hot standby).
 5. Add a cache layer for hot data (reduce DB pressure).
 6. Add CDN for static assets (reduce app server load, geo performance).
-7. Shard the DB when write throughput or storage hits limits.
+7. Apply database scaling: vertical scaling first, then horizontal scaling (sharding) when one-node limits persist.
 8. Extract high-traffic domains to microservices with their own DBs and async queues.
 9. Add multi-data center deployment for global availability and disaster resilience.
 10. Use consistent hashing to scale caches/partitions with minimal key remapping.
