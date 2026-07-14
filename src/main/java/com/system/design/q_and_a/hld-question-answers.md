@@ -14,6 +14,7 @@ Topics covered:
 - Idempotency
 - Network Protocols
 - CAP Theorem
+- Monolithic vs Microservices
 
 ---
 
@@ -390,6 +391,7 @@ Start with requirements, estimate scale, identify bottlenecks, design the happy 
 - Use **FTP** for legacy file transfer
 - Use **WebRTC** for peer-to-peer real-time media
 - Use **CAP Theorem** to explain consistency vs availability decisions under partition
+- Use **Monolith vs Microservices** tradeoffs based on team size, scale, and operational maturity
 
 ---
 
@@ -535,7 +537,79 @@ Example:
 
 ---
 
-## 15) Closing Guidance
+## 15) Monolithic vs Microservices
+
+### Q1. What is a monolithic architecture?
+**Answer:**
+A monolith is a single deployable application where most modules run in one process and are released together.
+
+### Q2. What is a microservices architecture?
+**Answer:**
+Microservices split the system into independently deployable services aligned to business capabilities.
+
+### Q3. What are the advantages of microservices?
+**Answer:**
+- independent deployment
+- scale only hot services
+- better team autonomy
+- fault isolation
+- technology flexibility when governed well
+
+### Q4. What are the disadvantages of microservices?
+**Answer:**
+- higher operational complexity
+- distributed debugging/tracing challenges
+- network latency/failure handling required
+- harder data consistency across service boundaries
+- higher platform and infrastructure cost
+
+### Q5. What are the advantages of monolithic architecture?
+**Answer:**
+- simple to start
+- easier local debugging
+- low initial infra complexity
+- easier in-transaction consistency in one DB
+- good fit for small teams and early products
+
+### Q6. What are the disadvantages of monolithic architecture?
+**Answer:**
+- tight coupling as system grows
+- slower releases with larger regression risk
+- inefficient scaling of hot modules
+- larger blast radius
+- harder long-term team autonomy
+
+### Q7. How do you handle the Decomposition phase?
+**Answer:**
+Decompose by business capabilities (bounded contexts), not technical layers. Start coarse-grained, extract high-value domains first, and avoid creating too many tiny services early.
+
+### Q8. How do you handle the Communication phase?
+**Answer:**
+Use synchronous calls (HTTP/gRPC) for immediate responses and asynchronous messaging for decoupling and resilience. Add timeouts, retries, circuit breakers, and idempotency.
+
+### Q9. How do you handle the Observability phase?
+**Answer:**
+Adopt logs + metrics + traces with correlation ids. Define SLOs and alerts. Distributed tracing is mandatory in microservices to diagnose cross-service latency and failures.
+
+### Q10. How do you handle the Database phase?
+**Answer:**
+Prefer database-per-service in microservices for ownership autonomy. Avoid direct cross-service DB access. Use outbox, saga, CDC, and idempotent consumers for cross-service consistency.
+
+### Q11. How do you handle the Integration phase?
+**Answer:**
+Use API gateway, contract testing, and anti-corruption layers for legacy boundaries. Protect integrations with circuit breakers, retries with jitter, and DLQ for async failure recovery.
+
+### Q12. When should you stay monolithic instead of migrating?
+**Answer:**
+Stay monolithic when domain complexity is still low, team is small, scaling pressure is limited, and operational maturity for distributed systems is not yet ready.
+
+### Q13. What is a strong migration approach from monolith to microservices?
+**Answer:**
+Use incremental strangler pattern migration: modularize monolith, extract high-value domains, introduce event-driven integration, and build platform capabilities (CI/CD, observability, templates) before large-scale extraction.
+
+---
+
+## 16) Closing Guidance
 
 In HLD interviews, the strongest answers do not just name components; they explain:
 - why the component exists,
