@@ -93,10 +93,29 @@ HTTP is the dominant web application protocol for request/response communication
 - `DELETE` remove a resource
 
 #### Important interview concepts
-- status codes such as `200`, `201`, `400`, `401`, `403`, `404`, `409`, `429`, `500`
-- headers such as `Authorization`, `Content-Type`, `Accept`, `Cache-Control`
-- idempotency of methods like `GET`, `PUT`, `DELETE`
-- HTTP/1.1 vs HTTP/2 vs HTTP/3
+- **Status codes and intent:**
+  - `200 OK` for successful read/update responses
+  - `201 Created` when a new resource is created (usually with location/resource id)
+  - `400/401/403/404` for client-side issues (bad input, auth, permission, missing resource)
+  - `409 Conflict` for state conflicts (for example duplicate create intent)
+  - `429 Too Many Requests` for throttling
+  - `5xx` for server/dependency failures
+- **Headers and why they matter:**
+  - `Authorization` carries identity token/credentials
+  - `Content-Type` declares request body format (for example JSON)
+  - `Accept` states preferred response format
+  - `Cache-Control` controls freshness/caching behavior
+  - `Idempotency-Key` can protect create APIs from duplicate retries
+- **Idempotency by method:**
+  - `GET`, `PUT`, `DELETE` are intended to be idempotent at API semantic level
+  - `POST` is not naturally idempotent, so add key-based dedup logic when retries are expected
+- **Version/protocol evolution:**
+  - HTTP/1.1 uses text framing and often multiple connections
+  - HTTP/2 multiplexes streams over one connection
+  - HTTP/3 runs over QUIC/UDP with better behavior under packet loss
+
+**Mini example (what to say in interview):**
+"For `POST /orders`, I return `201` on first success, store result by `Idempotency-Key`, and return cached response on retry to avoid duplicate orders."
 
 #### When to use
 Use HTTP for most web APIs, browser-to-server communication, and standard service APIs.
@@ -112,10 +131,23 @@ FTP is a file transfer protocol used for moving files between a client and a ser
 - FTP can operate in active or passive mode depending on who opens the data connection.
 
 #### Important interview concepts
-- control vs data channel
-- active vs passive mode
-- file upload/download
-- legacy protocol concerns around security
+- **Control vs data channels:**
+  - Control channel handles commands such as login, list, upload, download
+  - Data channel carries actual file bytes
+  - This split is the reason FTP behaves differently from single-channel HTTP uploads
+- **Active vs passive mode:**
+  - Active mode: server initiates data connection back to client
+  - Passive mode: client initiates both control and data connections
+  - Passive is more firewall/NAT-friendly and most common today
+- **Security posture:**
+  - Plain FTP is unencrypted (credentials/data visible in transit)
+  - In practice, prefer SFTP/FTPS or HTTPS-based upload pipelines
+- **Operational concerns:**
+  - Resume/retry strategy for large file transfers
+  - Throughput limits and transfer scheduling for batch windows
+
+**Mini example:**
+"For nightly partner file exchange behind strict NAT, I would use passive mode and encrypted transfer, with checksum validation after upload."
 
 #### When to use
 FTP is usually seen in legacy or specialized file-transfer environments. In modern systems, SFTP or HTTPS-based upload flows are often preferred.
@@ -131,14 +163,23 @@ SMTP is the protocol used to send email from clients to mail servers and between
 - The server accepts, queues, and forwards the email toward the recipient domain.
 
 #### Important interview concepts
-- sender/recipient flow
-- mail relay between servers
-- queuing and retry on delivery failure
-- SMTP is for sending, not for mailbox retrieval
+- **Send pipeline:**
+  - Client submits mail to outbound SMTP server
+  - Server relays mail to recipient domain's SMTP server
+  - Receiving server queues and delivers to mailbox subsystem
+- **Reliability behavior:**
+  - SMTP servers queue and retry transient failures
+  - Permanent failures generate bounce responses
+  - Retries/backoff are critical for internet-scale mail delivery
+- **Separation of concerns:**
+  - SMTP is only for sending/relay
+  - Mail retrieval is handled by IMAP/POP3
+- **Abuse controls you should mention:**
+  - SPF, DKIM, DMARC concepts in modern mail ecosystems
+  - rate limits and reputation checks on outbound gateways
 
-#### Related protocols
-- IMAP for reading and syncing mailbox contents
-- POP3 for downloading mail to a client
+**Mini example:**
+"If email provider is temporarily unavailable, the SMTP relay queues and retries instead of dropping messages immediately."
 
 #### When to use
 SMTP is the standard protocol for outbound email delivery.
@@ -194,9 +235,14 @@ WebRTC usually includes:
 
 #### Important interview concepts
 - signaling is not standardized by WebRTC; apps usually implement it themselves using HTTP/WebSocket
-- STUN helps discover public-facing addresses
-- TURN relays traffic when direct peer-to-peer connection fails
+- STUN helps discover public-facing addresses for direct connectivity attempts
+- TURN relays traffic when direct peer-to-peer connection fails (higher cost, more latency)
+- ICE tries multiple candidates and selects the best working path
 - WebRTC supports real-time media and data channels
+- codec, bitrate adaptation, and network jitter handling affect user call quality
+
+**Mini example:**
+"In a video-calling app, I use WebSocket for signaling, STUN for direct path discovery, and TURN fallback for restrictive corporate networks."
 
 #### When to use
 Use WebRTC for video calls, voice calls, and low-latency peer communication where direct connection is beneficial.
