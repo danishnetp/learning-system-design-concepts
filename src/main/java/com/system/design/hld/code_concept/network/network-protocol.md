@@ -254,8 +254,140 @@ Use WebRTC for video calls, voice calls, and low-latency peer communication wher
 
 ---
 
-## 4) Quick Comparison
+## 4) Transport Layer Protocols
 
+The transport layer is responsible for end-to-end process communication between applications running on hosts.
+
+### What transport layer protocols solve
+- multiplexing using ports (many app flows on one host)
+- segmentation and reassembly
+- reliability and ordered delivery (when required)
+- flow and congestion handling
+- latency vs reliability tradeoff
+
+### 4.1 TCP
+
+#### What is TCP?
+TCP is a connection-oriented, reliable, ordered byte-stream protocol.
+
+#### How it works
+1. 3-way handshake establishes connection.
+2. Data is sent in segments with sequence numbers.
+3. Receiver sends ACKs.
+4. Sender retransmits missing segments.
+5. Connection is closed gracefully.
+
+#### Important interview concepts
+- reliability via ACK + retransmission
+- ordered delivery guarantees
+- flow control (receiver window)
+- congestion control (slow start, congestion avoidance)
+- head-of-line blocking at stream level
+
+**Mini example:**
+"I use TCP for payment/order APIs where correctness and ordered reliable delivery matter more than ultra-low latency."
+
+### 4.2 UDP
+
+#### What is UDP?
+UDP is a connectionless datagram protocol with minimal overhead.
+
+#### How it works
+- sender transmits independent datagrams
+- no built-in ACK/retransmit/ordering
+- application adds reliability only if needed
+
+#### Important interview concepts
+- very low latency and low protocol overhead
+- packets can be lost, duplicated, or reordered
+- ideal when timeliness is more valuable than perfect delivery
+- common for real-time voice/video, gaming telemetry, DNS
+
+**Mini example:**
+"For live game position updates, UDP is preferred because old packets are less useful than fresh state."
+
+### 4.3 QUIC (transport over UDP)
+
+#### What is QUIC?
+QUIC is a modern transport protocol built on UDP that provides reliability, security (TLS), and multiplexed streams with faster connection setup.
+
+#### Important interview concepts
+- reduced handshake latency
+- stream multiplexing without TCP-style head-of-line across streams
+- improved behavior on mobile network changes
+- foundation for HTTP/3
+
+**Mini example:**
+"For mobile-first APIs with variable networks, HTTP/3 over QUIC can reduce latency and improve resilience during network transitions."
+
+### 4.4 SCTP (optional mention in interviews)
+
+#### What is SCTP?
+SCTP is a message-oriented transport protocol supporting multi-streaming and multi-homing.
+
+#### Why mention it
+- relevant for telecom/specialized domains
+- demonstrates awareness beyond TCP/UDP when interviewer asks alternatives
+
+---
+
+## 5) Network Layer Protocols
+
+The network layer handles host-to-host addressing and routing across networks.
+
+### What network layer protocols solve
+- logical addressing of hosts
+- routing packets across multiple hops
+- fragmentation/routing decisions
+- diagnostic and control signaling
+
+### 5.1 IP (Internet Protocol)
+
+#### What is IP?
+IP provides addressing and packet delivery across interconnected networks on a best-effort basis.
+
+#### Important interview concepts
+- IP is connectionless and best-effort (no delivery guarantee by itself)
+- reliability is handled by upper layers like TCP/application logic
+- routers forward packets based on destination IP and routing tables
+
+### 5.2 IPv4
+
+#### Key details
+- 32-bit addressing
+- widespread legacy compatibility
+- limited address space (drives NAT usage)
+
+### 5.3 IPv6
+
+#### Key details
+- 128-bit addressing with massive address space
+- simplified header design and better extensibility
+- reduces NAT pressure and improves end-to-end addressing model
+
+### 5.4 ICMP
+
+#### What is ICMP?
+ICMP carries control/diagnostic messages at network layer scope.
+
+#### Important interview concepts
+- used for diagnostics (`ping`, parts of `traceroute`)
+- reports network issues (destination unreachable, time exceeded)
+- does not carry business application payloads
+
+**Mini example:**
+"If users report intermittent latency, I check path behavior with `traceroute` (ICMP-based mechanisms) to identify hop-level issues."
+
+### Interview-level distinction to always mention
+- **Network layer (IP):** where to send packets (addressing/routing)
+- **Transport layer (TCP/UDP/QUIC):** how apps communicate end-to-end (reliability/latency semantics)
+- **Application layer (HTTP/WebSocket/SMTP/WebRTC signaling):** what the message means to the business logic
+
+---
+
+## 6) Quick Comparison
+
+### Application layer protocols
 | Protocol    | Communication style                                | Best for                     | Key note                              |
 |-------------|----------------------------------------------------|------------------------------|---------------------------------------|
 | HTTP        | request/response                                   | web APIs, browser apps       | stateless by default                  |
@@ -264,9 +396,18 @@ Use WebRTC for video calls, voice calls, and low-latency peer communication wher
 | WebSocket   | persistent bidirectional                           | real-time apps               | upgrade from HTTP                     |
 | WebRTC      | peer-to-peer media/data                            | calls, live media            | uses signaling + STUN/TURN            |
 
+### Transport and network protocols
+| Protocol     | Layer     | Core property                        | Best for                                      |
+|--------------|-----------|--------------------------------------|-----------------------------------------------|
+| TCP          | Transport | reliable, ordered stream             | APIs, transactions, correctness-first traffic |
+| UDP          | Transport | low-overhead datagrams               | real-time media/gaming/telemetry              |
+| QUIC         | Transport | reliable streams over UDP + TLS      | HTTP/3, mobile/low-latency web                |
+| IP (v4/v6)   | Network   | addressing and routing               | host-to-host packet delivery                  |
+| ICMP         | Network   | diagnostics/control                  | ping, traceroute, path troubleshooting        |
+
 ---
 
-## 5) Interview Answer Patterns
+## 7) Interview Answer Patterns
 
 ### If asked “How does HTTP work?”
 Say that the client sends a request, the server parses it, the server executes business logic, and returns a response with a status code and headers. Mention statelessness and common methods.
@@ -282,7 +423,7 @@ Say SMTP is specialized for email transfer and server relay, while HTTP is a gen
 
 ---
 
-## 6) Practical HLD Takeaway
+## 8) Practical HLD Takeaway
 
 In architecture interviews, choose the protocol based on the workload:
 - **HTTP** for standard API requests
@@ -290,5 +431,9 @@ In architecture interviews, choose the protocol based on the workload:
 - **SMTP** for outbound email workflows
 - **FTP** for legacy file transfer needs
 - **WebRTC** for direct real-time peer communication
+- **TCP** when ordered reliable delivery is required
+- **UDP** when freshness/latency is more important than perfect delivery
+- **QUIC/HTTP3** for modern low-latency web transport
+- **IP/ICMP** for routing fundamentals and network diagnostics
 
 The main interview goal is to show that you understand not just the protocol name, but also the connection model, reliability tradeoffs, and when each protocol fits the system design.
