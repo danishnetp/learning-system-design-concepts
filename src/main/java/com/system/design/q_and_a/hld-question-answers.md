@@ -609,6 +609,63 @@ Stay monolithic when domain complexity is still low, team is small, scaling pres
 **Answer:**
 Use incremental strangler pattern migration: modularize monolith, extract high-value domains, introduce event-driven integration, and build platform capabilities (CI/CD, observability, templates) before large-scale extraction.
 
+### Q14. What is the Decomposition pattern and when should you use it?
+**Answer:**
+Decomposition is the strategy for identifying right-sized service boundaries, using business capability or DDD bounded context as the split criterion.
+
+Use it when:
+- domain is stable and teams own clear capabilities
+- services have clearly different scaling or release needs
+
+Avoid when:
+- domain knowledge is still evolving
+- splitting would require distributed transactions everywhere
+
+### Q15. What is the Strangler Fig pattern?
+**Answer:**
+The Strangler Fig pattern migrates a monolith incrementally by placing a routing layer in front of it and shifting one feature at a time to new microservices, while the monolith continues to serve the rest.
+
+Use it when:
+- migrating a live production monolith with no downtime tolerance
+
+Avoid when:
+- starting a new system (nothing to strangle)
+- monolith DB is too tightly coupled to separate
+
+### Q16. What is the SAGA pattern and what are its two styles?
+**Answer:**
+SAGA manages long-running distributed workflows without 2PC. Each step executes locally and publishes an event. On failure, compensating actions undo prior steps.
+
+- **Choreography:** services react to events autonomously — loose coupling, harder to trace.
+- **Orchestration:** a central orchestrator drives each step — easier to observe, moderate coupling.
+
+Use when:
+- workflow spans multiple services (order fulfillment, onboarding)
+- 2PC is not feasible
+
+Avoid when:
+- single DB and short workflow make a simple local transaction sufficient
+
+### Q17. What is CQRS and when should you use it?
+**Answer:**
+CQRS separates write (command) and read (query) models. Commands mutate state through a write model; queries read from an optimized denormalized projection.
+
+Use when:
+- read and write traffic have very different shapes and scale needs
+- multiple tailored read views are needed from the same data
+
+Avoid when:
+- simple CRUD where read and write shape is identical
+- team is small or does not have capacity to maintain two models
+
+### Q18. What is the biggest risk of SAGA compensating transactions?
+**Answer:**
+Compensating transactions are not true rollbacks. Side effects that already occurred (email sent, payment attempted) may not be fully reversible. Design compensating actions explicitly for each step and make all consumers idempotent.
+
+### Q19. When should you choose CQRS over standard CRUD?
+**Answer:**
+Choose CQRS when the read query patterns are significantly different from the write model shape, when denormalized projections are needed for performance, or when you need multiple specialized views built from the same write stream.
+
 ---
 
 ## 16) Eventual Consistency
@@ -694,4 +751,3 @@ In HLD interviews, the strongest answers do not just name components; they expla
 - and how it behaves under failure.
 
 That is the standard expected for a production-grade system design discussion.
-
