@@ -52,24 +52,98 @@ A strong LLD answer should show:
 
 ### Q4. How do you start an LLD interview answer?
 **Answer:**
+Start by showing that you understand the problem before jumping into classes.
+
 Use this sequence:
 1. Clarify requirements and scope
+   - ask what features are in scope for v1
+   - ask which edge cases matter most
+   - confirm any constraints like scale, persistence, or concurrency
 2. Identify core entities
+   - list the main nouns in the problem statement
+   - examples: `Order`, `User`, `Ticket`, `Notification`, `ParkingSlot`
 3. Define responsibilities for each entity
+   - decide what each class should own
+   - keep each class focused on one responsibility
 4. Identify relationships between entities
-5. Create interfaces for varying behavior
+   - determine association, composition, or dependency
+   - decide which object creates, owns, or uses another object
+5. Create interfaces for behavior that may vary
+   - use interfaces for strategies, providers, repositories, and services that may have multiple implementations
 6. Choose design patterns only where useful
+   - for example: Strategy for varying behavior, Factory for object creation, Observer for event-driven updates
 7. Discuss validations, concurrency, and extensibility
+   - explain how you will enforce invariants
+   - mention thread safety if shared state exists
+   - show how the design supports future changes without major rewrites
+
+### A simple interview template
+You can say:
+"First I’ll clarify the requirements and confirm the scope. Then I’ll identify the main entities and their responsibilities, define relationships between them, and introduce interfaces wherever behavior may vary. After that, I’ll discuss patterns, validations, and any concurrency or extensibility concerns."
+
+### Example using a notification system
+If the problem is a notification system, your opening could be:
+- clarify channels: email, SMS, push, in-app
+- identify entities: `NotificationRequest`, `Notification`, `Template`, `UserPreference`
+- define responsibilities: rendering, sending, preference checks, retry handling
+- introduce interfaces: `NotificationSender`, `TemplateEngine`, `Provider`
+- mention future support for WhatsApp or fallback providers
+
+### Common mistake to avoid
+Do not start by writing classes immediately.
+Interviews usually reward a short requirements discussion first, because it shows good problem decomposition and prevents designing the wrong solution.
 
 ### Q5. What do interviewers usually evaluate in an LLD round?
 **Answer:**
-They usually look for:
-- object-oriented thinking
-- SOLID principle awareness
-- use of abstractions
-- maintainability
-- handling of change requests
-- communication of tradeoffs
+They usually look for a combination of design thinking, code organization, and the ability to handle change.
+
+More specifically, interviewers evaluate whether you can:
+- identify the right entities and responsibilities
+- model relationships correctly using composition, association, or inheritance where appropriate
+- apply OOP principles cleanly
+- use abstractions and interfaces instead of hardcoding behavior
+- follow SOLID principles, especially SRP, OCP, and DIP
+- keep the design extensible for future requirements
+- avoid unnecessary complexity and overengineering
+- think about edge cases, validation, and error handling
+- discuss testability and maintainability
+- explain tradeoffs clearly
+
+### What a strong answer looks like
+A strong LLD answer is not just a list of classes. It should show:
+- why each class exists
+- what responsibility it owns
+- how objects interact
+- where behavior may change in the future
+- how the design stays easy to test and extend
+
+### Example
+If the problem is a notification system, a strong candidate would not only say:
+- `EmailSender`
+- `SmsSender`
+- `PushSender`
+
+They would also explain:
+- `NotificationService` orchestrates the workflow
+- `NotificationSender` is an interface so new channels can be added later
+- templates and preferences are separated into their own services
+- retries and fallback are handled without changing the main flow
+
+### What interviewers usually prefer
+They usually prefer candidates who:
+- ask clarifying questions before designing
+- keep the first version simple
+- separate concerns cleanly
+- justify design choices instead of naming patterns mechanically
+- show awareness of future change
+
+### Common red flags
+Interviewers may consider it a weak answer if you:
+- jump into code without understanding requirements
+- create a huge class with many responsibilities
+- use inheritance everywhere
+- ignore edge cases or invalid inputs
+- cannot explain why you chose a particular design
 
 ---
 
