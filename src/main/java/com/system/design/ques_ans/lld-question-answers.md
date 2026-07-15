@@ -231,7 +231,52 @@ Example:
 **Answer:**
 Subtypes should be replaceable for their base types without breaking correctness.
 
+In simple words, if a piece of code works with a base class or interface, it should also work correctly with any subclass or implementation without needing special handling.
+
+This means the child type must honor the contract of the parent type:
+- it should not weaken the expected behavior
+- it should not throw unexpected errors for normal operations
+- it should not require callers to know which concrete subtype they are using
+
+### Why LSP matters
+LSP is important because it keeps inheritance and polymorphism safe. If a subtype behaves differently in a surprising way, then the design becomes fragile and callers can no longer trust the base type contract.
+
+### Example
 If `Bird` has `fly()`, then a `Penguin` subclass creates a design problem because it cannot behave like a normal flying bird.
+
+Better design:
+- `Bird` for shared bird properties
+- `Flyable` interface for flying behavior
+
+Then:
+- `Sparrow` can implement `Flyable`
+- `Penguin` can be a bird without being forced to fly
+
+### Another example
+If a system has a `PaymentMethod` interface, every implementation should be usable wherever a `PaymentMethod` is expected.
+
+For example:
+- `CreditCardPayment`
+- `PaypalPayment`
+- `UPIPayment`
+
+All of them should support the same basic contract, such as `pay(amount)`.
+
+If one implementation needs extra unsupported steps or throws exceptions for normal payments, that may be a sign of LSP violation.
+
+### Common signs of LSP violation
+- a subclass throws `UnsupportedOperationException` for a method that the parent promised
+- a subclass changes the meaning of the parent behavior
+- a subclass requires callers to check its concrete type before using it
+- a subclass cannot be used anywhere the parent type is expected
+
+### Interview explanation
+You can say: "I will use inheritance only when the subtype truly satisfies the base contract. If a subtype cannot behave like the parent in all valid use cases, I would separate the behavior using interfaces or composition instead."
+
+### Quick test for LSP
+Ask: "Can I replace the base type with this subtype without changing any caller logic or breaking correctness?"
+
+If the answer is no, the design likely violates LSP.
 
 ### Q5. What is Interface Segregation Principle (ISP)?
 **Answer:**
@@ -250,9 +295,73 @@ This avoids fake implementations or unsupported methods.
 **Answer:**
 High-level modules should not depend on low-level modules directly. Both should depend on abstractions.
 
-Example:
-- `OrderService` should depend on `PaymentProcessor`
-- not directly on `StripePaymentProcessor`
+In simple words, business logic should not be tightly coupled to a specific implementation detail.
+Instead of hardcoding concrete classes, we define interfaces or abstract contracts and let different implementations plug in underneath.
+
+### Why DIP matters
+DIP makes the design:
+- easier to extend
+- easier to test with mocks or fakes
+- easier to replace when a vendor or implementation changes
+- less dependent on concrete infrastructure details
+
+### Bad example
+Suppose `OrderService` directly creates `StripePaymentProcessor`:
+
+- `OrderService` depends on `StripePaymentProcessor`
+- if payment provider changes, `OrderService` must change
+- unit testing becomes harder because the class is tied to a real payment implementation
+
+### Better design
+Create an abstraction like `PaymentProcessor` and depend on that interface:
+
+- `OrderService` depends on `PaymentProcessor`
+- `StripePaymentProcessor` implements `PaymentProcessor`
+- `PaypalPaymentProcessor` also implements `PaymentProcessor`
+
+Then `OrderService` does not care which payment provider is used.
+
+### Example
+```text
+OrderService -> PaymentProcessor interface
+StripePaymentProcessor -> implements PaymentProcessor
+PaypalPaymentProcessor -> implements PaymentProcessor
+```
+
+In code, the high-level service can call:
+- `paymentProcessor.pay(amount)`
+
+without knowing the concrete class behind it.
+
+### Real-world example
+If you are building a notification system:
+- `NotificationService` should depend on `NotificationSender`
+- `EmailSender`, `SmsSender`, and `PushSender` should implement that contract
+
+This way, adding WhatsApp or changing email vendors does not force changes in the core service.
+
+### Dependency Injection relation
+DIP is often implemented using dependency injection:
+- constructor injection
+- setter injection
+- framework injection
+
+For example, `OrderService` can receive `PaymentProcessor` through its constructor instead of creating it internally.
+
+### Common DIP violation
+Hardcoding dependencies like this:
+- `new StripePaymentProcessor()` inside `OrderService`
+- `new SendGridEmailService()` inside business logic
+
+This creates tight coupling and makes the class harder to modify and test.
+
+### Interview explanation
+You can say: "I would make the high-level service depend on an abstraction such as `PaymentProcessor` or `NotificationSender`, and inject the concrete implementation from outside. That keeps the business logic independent of the low-level implementation and makes the design easier to extend and test."
+
+### Quick test for DIP
+Ask: "Can I replace this concrete dependency with another implementation or a mock without changing the service code?"
+
+If yes, the design is following DIP well.
 
 ### Q7. Which SOLID principle is most commonly tested in LLD interviews?
 **Answer:**
