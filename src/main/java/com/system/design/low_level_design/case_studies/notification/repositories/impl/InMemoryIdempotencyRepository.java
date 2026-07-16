@@ -21,7 +21,7 @@ public class InMemoryIdempotencyRepository implements IdempotencyRepository {
         if (storage.containsKey(key)) {
             IdempotencyRecord record = storage.get(key);
             // Check if record is expired
-            if (System.currentTimeMillis() - record.createdAt > TTL_MILLIS) {
+            if (isExpired(record.createdAt, System.currentTimeMillis())) {
                 storage.remove(key);
                 storage.put(key, new IdempotencyRecord(Instant.now(), null));
                 return true;
@@ -38,7 +38,7 @@ public class InMemoryIdempotencyRepository implements IdempotencyRepository {
             return Optional.empty();
         }
         IdempotencyRecord record = storage.get(key);
-        if (System.currentTimeMillis() - record.createdAt > TTL_MILLIS) {
+        if (isExpired(record.createdAt, System.currentTimeMillis())) {
             storage.remove(key);
             return Optional.empty();
         }
@@ -55,7 +55,11 @@ public class InMemoryIdempotencyRepository implements IdempotencyRepository {
     @Override
     public synchronized void cleanupExpired() {
         long now = System.currentTimeMillis();
-        storage.entrySet().removeIf(entry -> (now - entry.getValue().createdAt.toEpochMilli()) > TTL_MILLIS);
+        storage.entrySet().removeIf(entry -> isExpired(entry.getValue().createdAt, now));
+    }
+
+    private boolean isExpired(Instant createdAt, long nowMillis) {
+        return (nowMillis - createdAt.toEpochMilli()) > TTL_MILLIS;
     }
 
     private static class IdempotencyRecord {
