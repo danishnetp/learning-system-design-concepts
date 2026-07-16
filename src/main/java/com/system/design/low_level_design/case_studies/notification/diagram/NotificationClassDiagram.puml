@@ -1,0 +1,168 @@
+@startuml NotificationClassDiagram
+
+title Notification Service - LLD Class Diagram
+
+skinparam backgroundColor #FAFAFA
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "Domain Entities" {
+  class NotificationRequest {
+    +requestId: String
+    +userId: String
+    +type: NotificationType
+    +templateId: String
+    +channels: Set<NotificationChannel>
+    +payload: Map<String, Object>
+    +priority: Priority
+    +scheduledAt: Instant
+    +idempotencyKey: String
+  }
+
+  class Notification {
+    +notificationId: String
+    +requestId: String
+    +userId: String
+    +channel: NotificationChannel
+    +type: NotificationType
+    +templateId: String
+    +subject: String
+    +body: String
+    +status: NotificationStatus
+    +attemptCount: int
+  }
+
+  class Template {
+    +templateId: String
+    +name: String
+    +channel: NotificationChannel
+    +locale: String
+    +subject: String
+    +body: String
+    +active: boolean
+  }
+
+  class DeliveryAttempt {
+    +attemptId: String
+    +notificationId: String
+    +providerName: String
+    +attemptNumber: int
+    +status: NotificationStatus
+    +errorCode: String
+    +errorMessage: String
+  }
+
+  class UserPreference {
+    +userId: String
+    +type: NotificationType
+    +channel: NotificationChannel
+    +enabled: boolean
+    +quietHoursStart: LocalTime
+    +quietHoursEnd: LocalTime
+  }
+}
+
+package "Core Service" {
+  class NotificationService {
+    +send(request): List<String>
+    +getNotificationStatus(notificationId): Optional<Notification>
+    +getDeliveryAttempts(notificationId): List<DeliveryAttempt>
+    +retry(notificationId): boolean
+    +cancel(notificationId): boolean
+  }
+
+  class TemplateService
+  class PreferenceService
+  class NotificationValidator
+}
+
+package "Abstractions" {
+  interface NotificationSender {
+    +send(notification): SendResult
+    +getChannel(): NotificationChannel
+    +canSend(notification): boolean
+  }
+
+  interface ChannelProvider {
+    +deliver(recipient, subject, body, metadata): SendResult
+    +getChannel(): NotificationChannel
+    +getProviderName(): String
+    +isAvailable(): boolean
+  }
+
+  interface TemplateEngine {
+    +render(template, variables): RenderedTemplate
+    +validateVariables(template, variables): boolean
+  }
+
+  interface RetryPolicy {
+    +canRetry(notification, attemptCount): boolean
+    +getNextBackoff(attemptCount): Duration
+    +getMaxRetries(): int
+  }
+}
+
+package "Factories and Implementations" {
+  class NotificationSenderFactory {
+    +getSender(channel): NotificationSender
+    +registerSender(channel, sender)
+  }
+
+  class EmailNotificationSender
+  class SmsNotificationSender
+  class PushNotificationSender
+  class InAppNotificationSender
+
+  class SmtpEmailProvider
+  class TwilioSmsProvider
+  class FirebasePushProvider
+
+  class SimpleTemplateEngine
+  class ExponentialBackoffRetryPolicy
+}
+
+package "Repositories" {
+  interface NotificationRepository
+  interface TemplateRepository
+  interface PreferenceRepository
+  interface DeliveryAttemptRepository
+  interface IdempotencyRepository
+}
+
+NotificationService --> NotificationValidator
+NotificationService --> TemplateService
+NotificationService --> PreferenceService
+NotificationService --> TemplateEngine
+NotificationService --> RetryPolicy
+NotificationService --> NotificationSenderFactory
+NotificationService --> NotificationRepository
+NotificationService --> DeliveryAttemptRepository
+NotificationService --> IdempotencyRepository
+
+TemplateService --> TemplateRepository
+PreferenceService --> PreferenceRepository
+
+NotificationSenderFactory --> NotificationSender
+EmailNotificationSender ..|> NotificationSender
+SmsNotificationSender ..|> NotificationSender
+PushNotificationSender ..|> NotificationSender
+InAppNotificationSender ..|> NotificationSender
+
+SmtpEmailProvider ..|> ChannelProvider
+TwilioSmsProvider ..|> ChannelProvider
+FirebasePushProvider ..|> ChannelProvider
+
+EmailNotificationSender --> ChannelProvider
+SmsNotificationSender --> ChannelProvider
+PushNotificationSender --> ChannelProvider
+
+SimpleTemplateEngine ..|> TemplateEngine
+ExponentialBackoffRetryPolicy ..|> RetryPolicy
+
+NotificationRequest "1" --> "1..*" Notification : creates
+Notification "1" --> "0..*" DeliveryAttempt : tracks
+Notification "*" --> "1" Template : uses
+UserPreference "*" --> "1" NotificationRequest : governs channels
+
+@enduml
+
