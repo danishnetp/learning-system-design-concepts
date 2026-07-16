@@ -1,0 +1,235 @@
+@startuml ParkingClassDiagram
+
+title Parking Slot System — LLD Class Diagram
+
+skinparam backgroundColor #FAFAFA
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+' ──────────── ENUMS ────────────
+package "enums" {
+  enum VehicleType    { BIKE · CAR · SUV · EV · TRUCK }
+  enum SlotStatus     { AVAILABLE · OCCUPIED · RESERVED · BLOCKED · OUT_OF_SERVICE }
+  enum TicketStatus   { ACTIVE · PAYMENT_PENDING · PAID · CLOSED · LOST · CANCELLED }
+  enum ReservationStatus { CREATED · CONFIRMED · CHECKED_IN · EXPIRED · CANCELLED · NO_SHOW }
+  enum PaymentStatus  { INITIATED · SUCCESS · FAILED · REFUNDED }
+  enum PaymentMethod  { CASH · CARD · UPI · WALLET · SUBSCRIPTION }
+}
+
+' ──────────── ENTITIES ────────────
+package "entities" {
+  class ParkingLot {
+    +lotId: String
+    +name: String
+    +address: String
+    +floors: List<Floor>
+    +active: boolean
+    +totalAvailableSlots(): long
+  }
+
+  class Floor {
+    +floorId: String
+    +lotId: String
+    +label: String
+    +floorNumber: int
+    +slots: List<ParkingSlot>
+  }
+
+  class ParkingSlot {
+    +slotId: String
+    +floorId: String
+    +lotId: String
+    +slotNumber: String
+    +supportedVehicleTypes: Set<VehicleType>
+    +hasCharger: boolean
+    +status: SlotStatus
+    +version: long
+    +occupyIfAvailable(): boolean
+    +reserveIfAvailable(): boolean
+    +release(): void
+  }
+
+  class Vehicle {
+    +vehicleId: String
+    +licensePlate: String
+    +vehicleType: VehicleType
+    +ownerId: String
+  }
+
+  class ParkingTicket {
+    +ticketId: String
+    +lotId: String
+    +slotId: String
+    +vehiclePlate: String
+    +vehicleType: VehicleType
+    +entryGateId: String
+    +entryTime: Instant
+    +pricingVersion: String
+    +status: TicketStatus
+    +totalAmount: BigDecimal
+    +markPaymentPending(amount)
+    +markPaid(paymentId)
+    +markClosed()
+    +markLost()
+  }
+
+  class Reservation {
+    +reservationId: String
+    +userId: String
+    +lotId: String
+    +vehicleType: VehicleType
+    +reservedFrom: Instant
+    +reservedTo: Instant
+    +status: ReservationStatus
+    +assignedSlotId: String
+    +confirm(slotId)
+    +checkIn(ticketId)
+    +cancel()
+    +expire()
+    +markNoShow()
+    +isHoldWindowActive(): boolean
+  }
+
+  class Payment {
+    +paymentId: String
+    +ticketId: String
+    +amount: BigDecimal
+    +method: PaymentMethod
+    +status: PaymentStatus
+    +providerRef: String
+    +idempotencyKey: String
+    +markSuccess(ref)
+    +markFailed(reason)
+    +markRefunded()
+  }
+}
+
+' ──────────── MODELS/DTOs ────────────
+package "models" {
+  class ParkRequest
+  class UnparkRequest
+  class ExitSummary
+  class SlotView
+  class AllocationContext
+  class TicketSnapshot
+  class Money
+  class PaymentResult
+  class CreateReservationRequest
+}
+
+' ──────────── INTERFACES ────────────
+package "interfaces" {
+  interface SlotAllocationStrategy {
+    +allocate(ctx: AllocationContext): Optional<ParkingSlot>
+    +strategyName(): String
+  }
+
+  interface PricingPolicy {
+    +calculate(snapshot: TicketSnapshot): Money
+    +policyVersion(): String
+  }
+
+  interface PaymentGateway {
+    +charge(ticketId, amount, method, idempotencyKey): PaymentResult
+    +refund(paymentId, amount): PaymentResult
+    +providerName(): String
+  }
+}
+
+' ──────────── STRATEGIES ────────────
+package "strategy" {
+  class NearestEntryStrategy
+  class LowestFloorStrategy
+  class LeastUsedStrategy
+}
+
+' ──────────── PRICING ────────────
+package "pricing" {
+  class FlatRatePricingPolicy
+  class SlabPricingPolicy
+  class DynamicDemandPricingPolicy
+}
+
+' ──────────── PAYMENT ────────────
+package "payment" {
+  class MockPaymentGateway
+}
+
+' ──────────── SERVICES ────────────
+package "service" {
+  class ParkingService {
+    +park(req: ParkRequest): ParkingTicket
+    +unpark(req: UnparkRequest): ExitSummary
+    +getAvailability(lotId, type): SlotView
+    +estimateFare(ticketId): Money
+    +reportLostTicket(ticketId)
+    +cancelTicket(ticketId)
+    +registerLot(lot): ParkingLot
+  }
+
+  class ReservationService {
+    +create(req): Reservation
+    +checkIn(reservationId, ticketId): Reservation
+    +cancel(reservationId)
+    +markNoShow(reservationId)
+    +expireStaleReservations()
+  }
+
+  class PaymentService {
+    +charge(ticketId, amount, method, key): Payment
+    +refund(paymentId): Payment
+  }
+
+  class ParkingValidator {
+    +validateParkRequest(req, lot)
+    +validateUnparkRequest(req)
+    +normalizePlate(plate): String
+  }
+}
+
+' ──────────── REPOSITORIES ────────────
+package "repositories" {
+  interface LotRepository
+  interface SlotRepository
+  interface TicketRepository
+  interface ReservationRepository
+  interface PaymentRepository
+}
+
+' ──────────── RELATIONSHIPS ────────────
+ParkingLot "1" *-- "1..*" Floor
+Floor "1" *-- "1..*" ParkingSlot
+
+ParkingTicket --> ParkingSlot : assigned to
+ParkingTicket --> ParkingLot  : belongs to
+Reservation  --> ParkingSlot  : reserves
+
+NearestEntryStrategy  ..|> SlotAllocationStrategy
+LowestFloorStrategy   ..|> SlotAllocationStrategy
+LeastUsedStrategy     ..|> SlotAllocationStrategy
+
+FlatRatePricingPolicy        ..|> PricingPolicy
+SlabPricingPolicy            ..|> PricingPolicy
+DynamicDemandPricingPolicy   ..|> PricingPolicy
+
+MockPaymentGateway ..|> PaymentGateway
+
+ParkingService --> SlotAllocationStrategy
+ParkingService --> PricingPolicy
+ParkingService --> PaymentService
+ParkingService --> ReservationService
+ParkingService --> ParkingValidator
+ParkingService --> LotRepository
+ParkingService --> SlotRepository
+ParkingService --> TicketRepository
+
+PaymentService --> PaymentGateway
+PaymentService --> PaymentRepository
+
+ReservationService --> SlotAllocationStrategy
+ReservationService --> LotRepository
+ReservationService --> SlotRepository
+ReservationService --> ReservationRepository
+
+@enduml
+

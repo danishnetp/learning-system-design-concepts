@@ -1,0 +1,106 @@
+@startuml ParkingEntryExitSequence
+
+title Parking Slot System — Entry & Exit Sequence
+
+autonumber
+skinparam backgroundColor #FAFAFA
+skinparam sequenceMessageAlign center
+
+actor       "Vehicle / Gate" as Gate
+participant "ParkingService"      as PS
+participant "ParkingValidator"    as PV
+participant "LotRepository"       as LR
+participant "TicketRepository"    as TR
+participant "SlotAllocationStrategy" as AS
+participant "ParkingSlot"         as SLOT
+participant "SlotRepository"      as SR
+
+== Entry (Walk-in) ==
+
+Gate -> PS : park(ParkRequest)
+PS -> PV   : validateParkRequest(req, lot)
+PV --> PS  : ok
+
+PS -> LR   : findById(lotId)
+LR --> PS  : ParkingLot
+
+PS -> TR   : findActiveByPlate(plate, lotId)
+TR --> PS  : empty (no duplicate)
+
+PS -> AS   : allocate(AllocationContext)
+AS --> PS  : ParkingSlot candidate
+
+PS -> SLOT : occupyIfAvailable()
+SLOT --> PS : true  [atomic CAS]
+
+PS -> SR   : update(slot — OCCUPIED)
+PS -> TR   : save(ParkingTicket — ACTIVE)
+PS --> Gate : ParkingTicket (entry issued, barrier opens)
+
+== Exit ==
+
+actor       "Vehicle / Gate" as ExitGate
+participant "PricingPolicy"  as PP
+participant "PaymentService" as PAY
+participant "PaymentGateway" as GW
+participant "PaymentRepository" as PR
+
+ExitGate -> PS : unpark(UnparkRequest)
+PS -> PV   : validateUnparkRequest(req)
+PV --> PS  : ok
+
+PS -> TR   : findById(ticketId)
+TR --> PS  : ParkingTicket (ACTIVE)
+
+PS -> PP   : calculate(TicketSnapshot)
+PP --> PS  : Money (fare)
+
+PS -> TR   : update(ticket — PAYMENT_PENDING)
+
+PS -> PAY  : charge(ticketId, fare, method, idempotencyKey)
+PAY -> PR  : findByIdempotencyKey(key)
+PR --> PAY : empty (first attempt)
+
+PAY -> PR  : save(Payment — INITIATED)
+PAY -> GW  : charge(ticketId, amount, method, key)
+GW --> PAY : PaymentResult(SUCCESS)
+
+PAY -> PR  : update(Payment — SUCCESS)
+PAY --> PS : Payment entity
+
+PS -> TR   : update(ticket — PAID → CLOSED)
+PS -> SR   : findById(slotId)
+SR --> PS  : ParkingSlot
+PS -> SLOT : release()
+PS -> SR   : update(slot — AVAILABLE)
+
+PS --> ExitGate : ExitSummary (barrier opens, receipt printed)
+
+== Reservation Check-in ==
+
+actor "User" as User
+participant "ReservationService" as RS
+
+User -> RS : create(CreateReservationRequest)
+RS -> LR   : findById(lotId)
+LR --> RS  : ParkingLot
+
+RS -> AS   : allocate(ctx)
+AS --> RS  : ParkingSlot candidate
+
+RS -> SLOT : reserveIfAvailable()
+SLOT --> RS : true
+
+RS -> SR   : update(slot — RESERVED)
+RS --> User : Reservation (CONFIRMED, slotId assigned)
+
+User -> PS : park(ParkRequest with reservationId)
+PS -> SLOT : setStatus(OCCUPIED)  [RESERVED → OCCUPIED]
+PS -> SR   : update(slot)
+PS -> TR   : save(ParkingTicket)
+PS -> RS   : checkIn(reservationId, ticketId)
+RS --> PS  : Reservation (CHECKED_IN)
+PS --> User : ParkingTicket (entry issued)
+
+@enduml
+
