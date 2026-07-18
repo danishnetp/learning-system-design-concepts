@@ -1,4 +1,4 @@
-# PostApiIssueSequence (GitHub Renderable)
+# PostApiIssueSequence
 
 ```mermaid
 sequenceDiagram
@@ -23,10 +23,5 @@ sequenceDiagram
     API-->>Client: 201 Created (order_id=102)
     end
 
-    note over DB
-      Problem: same business intent processed twice.
-      No idempotency key + no response replay.
-      Impact: duplicate order, double charge risk.
-    end note
+    note over DB: Problem: same business intent processed twice.<br/>No idempotency key + no response replay.<br/>Impact: duplicate order, double charge risk.
 ```
-
