@@ -1,6 +1,4 @@
-# Notification Service - Class Diagram (GitHub Renderable)
-
-This Mermaid diagram renders directly in GitHub web.
+# Notification Service - Class Diagram
 
 ```mermaid
 classDiagram

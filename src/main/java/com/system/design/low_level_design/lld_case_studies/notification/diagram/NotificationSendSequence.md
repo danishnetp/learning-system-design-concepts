@@ -1,6 +1,4 @@
-# Notification Service - Send Flow (GitHub Renderable Sequence)
-
-This Mermaid sequence diagram renders directly on GitHub web.
+# Notification Service - Send Flow
 
 ```mermaid
 sequenceDiagram
