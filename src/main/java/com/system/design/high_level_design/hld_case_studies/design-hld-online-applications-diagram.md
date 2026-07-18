@@ -452,3 +452,191 @@ flowchart LR
 
 "At marketplace scale, I split the system into customer-facing APIs and heavy back-office pipelines like seller onboarding, catalog ingestion, and search indexing. Checkout is reliability-first: idempotent APIs, transactional outbox, and event-driven downstream processing. Inventory uses reservation with TTL to minimize oversell while maintaining conversion. Search and recommendations are separate relevance systems with feature store + A/B testing. I keep strong consistency for payment/order/inventory commit paths and eventual consistency for projections, personalization, and notifications."
 
+## Additional scalable options (beyond current design)
+
+Use these as "next evolution" points in interview once baseline architecture is clear.
+
+### 1) Edge and API scaling
+- **Multi-CDN strategy:** Route traffic across two CDN providers for regional performance and resilience.
+- **Global traffic steering:** Geo DNS / Anycast routing to nearest healthy region.
+- **Adaptive rate limiting:** Per endpoint + user tier + behavior risk score.
+- **API response compression + partial response fields:** Reduce payload and network cost.
+
+**When to use:** High global traffic, latency-sensitive markets, or regional outage risk.
+
+### 2) Service-layer scaling
+- **Cell-based architecture (cell/partition per tenant or geography):** Limits blast radius during failures.
+- **Queue-based load leveling for bursty endpoints:** Convert expensive sync work into buffered async jobs.
+- **Auto-scaling by SLO signals:** Scale on p95 latency + queue lag, not only CPU.
+- **Request coalescing (single-flight):** Prevent duplicate backend work for same hot key.
+
+**When to use:** Frequent traffic spikes (sales events, flash deals, peak shopping windows).
+
+### 3) Catalog/search scaling
+- **Split read/write search clusters:** Isolate indexing load from query serving.
+- **Hierarchical caching:** Edge cache + gateway cache + service cache + Redis.
+- **Hot product pre-warming:** Preload top SKUs into cache before campaigns.
+- **Search query federation:** Separate clusters per category/language/region.
+
+**When to use:** Large catalogs, heavy search/filter traffic, sale-time spikes.
+
+### 4) Order and payment scaling
+- **Order ID partitioning / range bucketing:** Enables efficient horizontal sharding.
+- **Saga orchestration with compensations:** Scales distributed transaction workflows safely.
+- **Payment retry orchestration service:** Centralized policy for callback retries and reconciliation.
+- **Idempotency store with TTL + dedupe index:** High-throughput duplicate protection.
+
+**When to use:** High write volume with strict correctness on order/payment lifecycle.
+
+### 5) Inventory scaling options
+- **Regional inventory partitions:** Keep stock operations local to region for low latency.
+- **Two-level inventory model:** Available-to-promise cache + strongly consistent commit layer.
+- **Seller safety stock buffers:** Reduce oversell during high concurrency.
+- **Reservation queue per SKU group:** Avoid hotspot lock contention on viral items.
+
+**When to use:** Frequently changing stock, multiple seller warehouses, hot SKUs.
+
+### 6) Data-store scaling
+- **Sharding strategy evolution:**
+  - Stage 1: single primary + replicas
+  - Stage 2: shard by `user_id` / `order_id`
+  - Stage 3: regional shards + federated query layer
+- **CQRS read models:** Dedicated denormalized read stores for high-volume query APIs.
+- **Materialized views with async refresh:** Faster reads for dashboards and order history.
+- **Cold/hot tiering:** Move old immutable data to cheaper storage.
+
+**When to use:** Primary DB saturation, storage growth, heavy mixed read/write workloads.
+
+### 7) Event and async pipeline scaling
+- **Partitioned event topics:** Partition by order/user/seller key for parallel consumption.
+- **Consumer groups with autoscaling:** Scale workers based on consumer lag.
+- **Replayable event logs:** Rebuild caches/indexes/projections from event history.
+- **Priority queues:** Separate customer-critical events from batch analytics events.
+
+**When to use:** High event throughput, backlogs during campaigns, reprocessing needs.
+
+### 8) Multi-region scaling patterns
+- **Active-passive for checkout path:** Simple failover for critical writes.
+- **Active-active for read-heavy services:** Search/catalog/personalization served in-region.
+- **Data sovereignty split:** Region-local storage for compliance constraints.
+- **Cross-region async replication with conflict policy:** Last-write-wins or domain-specific merge.
+
+**When to use:** Global user base, compliance constraints, low-latency regional UX goals.
+
+### 9) Personalization/recommendation scaling
+- **Feature store online/offline split:** Low-latency serving + batch training pipeline.
+- **Approximate nearest-neighbor vector search:** Scalable candidate retrieval for recommendations.
+- **Model inference gateway:** Standardized deployment/versioning for ranking models.
+- **Fallback strategy chain:** Personalized -> category popular -> global popular.
+
+**When to use:** Large recommendation workloads and strict page latency budgets.
+
+### 10) Operations and reliability scaling
+- **Progressive delivery at scale:** Canary by region/cohort + automated rollback on SLO breach.
+- **SLO-aware traffic shedding:** Drop low-priority workloads first during overload.
+- **Synthetic traffic probes:** Continuous validation of critical customer journeys.
+- **Game days/chaos testing:** Validate resilience assumptions regularly.
+
+**When to use:** Large deployments with frequent releases and strict uptime goals.
+
+---
+
+## Scaling trigger matrix (what to add and when)
+
+| Symptom | First move | Next move |
+|---|---|---|
+| p95 read latency rising | Add Redis + query/index tuning | Add read replicas + CQRS read models |
+| DB write CPU saturation | Batch non-critical writes + tune indexes | Shard write path by key |
+| Queue lag growing | Scale consumer groups | Partition topics + priority queues |
+| Overselling during sales | Add reservation TTL + safety stock | SKU-level serialization / reservation queues |
+| Global latency complaints | Multi-CDN + geo routing | Multi-region active-active for reads |
+| Search staleness | Priority indexing for stock/price | Split ingest/search clusters |
+
+---
+
+## 45-second "scalability" answer for interviewer
+
+"Beyond the base design, I scale in layers: edge scaling with multi-CDN and geo-routing, service scaling with cell architecture and SLO-driven autoscaling, and data scaling with replicas first then sharding and CQRS read models. For event-heavy flows I use partitioned topics, autoscaled consumers, and replayable logs. For marketplace-specific hotspots like inventory and checkout, I use reservation TTL, idempotency, and saga orchestration. I evolve to multi-region patterns based on latency, compliance, and availability goals."
+
+## Interview questions and model answers (with this diagram)
+
+### 1) Why do you need both `CDN` and `Redis`?
+**Answer:** `CDN` caches static/edge-cacheable content near users; `Redis` caches dynamic application data (hot product details, session fragments, computed responses). They solve different latency layers.
+
+### 2) Why put `WAF` and `Rate Limiter` before `API Gateway`?
+**Answer:** It blocks malicious/abusive traffic early, protecting expensive backend resources and reducing attack blast radius.
+
+### 3) Why is `SQL` the source of truth here?
+**Answer:** Order/payment/inventory commit paths need ACID guarantees and strong consistency. SQL provides reliable transactions and integrity constraints.
+
+### 4) What consistency model do you use?
+**Answer:** Strong consistency for order-payment-inventory commit path (`ORDER`, `PAY`, `SQL`). Eventual consistency for projections (`IDX`, notification, analytics, cache refresh).
+
+### 5) Why use `Read Replica` if `Redis` already exists?
+**Answer:** `Redis` serves hot keys; replicas handle broader read workloads and cache misses. Replicas reduce pressure on primary for query-heavy but less-hot traffic.
+
+### 6) How do you handle cache invalidation?
+**Answer:** Write-through or event-driven invalidation from async workers; plus TTL fallback. On miss/stale, fallback to DB and repopulate.
+
+### 7) Why introduce `Transactional Outbox` instead of direct broker publish?
+**Answer:** Direct dual-write can lose events on partial failure. Outbox guarantees business row + event row are committed atomically, then relay publishes safely.
+
+### 8) How do you avoid duplicate event processing?
+**Answer:** At-least-once delivery is expected. Consumers are idempotent using event IDs + dedupe store/unique constraint.
+
+### 9) What is the role of `DLQ`?
+**Answer:** Isolates poison messages after retry limit, prevents queue clogging, and enables controlled replay with alerting.
+
+### 10) How does this design scale during flash sales?
+**Answer:** Multi-layer caching, autoscaled stateless services, queue-based load leveling, partitioned topics, and inventory reservation with TTL to reduce contention.
+
+### 11) How do you prevent overselling inventory?
+**Answer:** Reservation (soft lock) at checkout with TTL, confirm on payment success, release on failure/timeout, plus reconciliation and safety stock buffers.
+
+### 12) Why separate `Search Index` from primary DB?
+**Answer:** Search needs full-text, filtering, ranking, and high-QPS query patterns that are inefficient on OLTP DB. Index serves fast search independently.
+
+### 13) How do you keep search results fresh?
+**Answer:** Consume product/price/inventory events, prioritize critical updates (price/stock) near real-time, batch non-critical enrichments.
+
+### 14) How do you handle payment gateway timeout but later success callback?
+**Answer:** Use idempotency keys + state machine transitions; accept callback as source of payment truth, reconcile asynchronously, avoid double charge/order.
+
+### 15) Why use async workers for notifications/analytics?
+**Answer:** These are non-critical to immediate user confirmation. Async processing reduces request latency and improves resilience under spikes.
+
+### 16) What observability signals would you monitor first?
+**Answer:** p95 latency, error rate, primary DB CPU/locks, cache hit ratio, broker lag, retry counts, DLQ depth, payment callback failure rate.
+
+### 17) How would you evolve from v1 to global scale?
+**Answer:** Start single-region multi-AZ, add geo-routing + multi-CDN, move read-heavy services to active-active multi-region, keep write path controlled (active-passive or conflict strategy).
+
+### 18) How do you decide monolith vs microservices initially?
+**Answer:** Start modular monolith for speed and simplicity, split by bounded contexts when team scale, deploy cadence, or traffic profile requires independent scaling.
+
+### 19) Where would you apply CQRS in this architecture?
+**Answer:** High-read domains like order history/search/list pages: write to SQL; build denormalized read models asynchronously for fast query APIs.
+
+### 20) What are your top failure scenarios and mitigations?
+**Answer:**
+- Broker down -> retry + backoff + DLQ.
+- DB primary pressure -> replicas, query tuning, sharding plan.
+- Payment callback duplication -> idempotent state transitions.
+- Cache outage -> graceful DB fallback + controlled degradation.
+
+---
+
+## Rapid-fire interviewer follow-ups (one-line answers)
+
+- **Why not exactly-once globally?** Too costly/complex across boundaries; at-least-once + idempotency is practical.
+- **Why not only NoSQL?** Critical transactional workflows need strong relational guarantees.
+- **How do you roll out safely?** Canary + SLO-based rollback + feature flags.
+- **How do you reduce blast radius?** Cell-based partitions + bulkheads + circuit breakers.
+- **How do you recover from bad deployment?** Automated rollback, replay events from log, rebuild projections.
+
+---
+
+## 2-minute interview script using this Q&A
+
+"I start at edge with CDN, WAF, and rate limiting to protect latency and security. API gateway routes to stateless services. For correctness, SQL is source of truth for order/payment paths. For scale, reads are optimized through Redis, replicas, and a separate search index. For reliability, I use transactional outbox so DB writes and events stay consistent; relay publishes to broker and workers process side effects asynchronously. Failures are handled with retries, idempotency, and DLQ. As traffic grows, I evolve with sharding, CQRS read models, partitioned topics, and multi-region strategies based on latency and availability goals."
+
