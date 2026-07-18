@@ -1,0 +1,149 @@
+@startuml OnlineApplicationHLD
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 13
+
+skinparam activity {
+  BackgroundColor #EAF3FF
+  BorderColor #2C6FB7
+  FontColor #1F1F1F
+  DiamondBackgroundColor #FFF7DF
+  DiamondBorderColor #C28A00
+  DiamondFontColor #1F1F1F
+  StartColor #2E7D32
+  EndColor #B71C1C
+  ArrowColor #2C3E50
+}
+
+skinparam note {
+  BackgroundColor #FFFDE7
+  BorderColor #E6A700
+  FontColor #3D3D3D
+}
+
+title <b>High-Level System Design: Online Application</b>\n<size:12><color:#555555>Interview-oriented end-to-end flow</color></size>
+
+|#E8F5E9|Client (Web/Mobile)|
+|#E3F2FD|Edge (CDN + WAF + Rate Limit)|
+|#F1F8E9|API Gateway / LB|
+|#E8EAF6|Core Services|
+|#FFF8E1|Data Layer|
+|#FCE4EC|Async Layer|
+|#E0F7FA|External Integrations|
+
+|Client (Web/Mobile)|
+start
+:User action\n(signup / browse / order / booking);
+
+|Edge (CDN + WAF + Rate Limit)|
+:Serve static assets from CDN;
+if (Dynamic API request?) then (yes)
+  :Forward request to API gateway path;
+else (no)
+  :Return cached static content;
+  stop
+endif
+:WAF validation + auth pre-check + rate limit;
+
+|API Gateway / LB|
+:Route request to service\n(Auth/Catalog/Order/Search/Payment);
+:Attach correlation-id and trace-id;
+
+|Core Services|
+if (Read flow?) then (yes)
+  :Process read request;
+  if (Cache hit?) then (yes)
+    |Data Layer|
+    :Read from Redis cache;
+    |Core Services|
+    :Build response payload;
+  else (no)
+    |Data Layer|
+    :Read from Search index or Read Replica;
+    :Populate cache with TTL;
+    |Core Services|
+    :Build response payload;
+  endif
+
+  |API Gateway / LB|
+  :Return P95-optimized response;
+  |Client (Web/Mobile)|
+  :Render UI;
+  stop
+
+else (write flow)
+  :Validate request + idempotency key;
+
+  |Data Layer|
+  :Begin DB transaction;
+  :Write business row\n(order/booking/payment intent);
+  :Write outbox event\n(status=PENDING);
+  :Commit transaction;
+
+  |Core Services|
+  :Return success response\n(transaction accepted);
+
+  |API Gateway / LB|
+  :Send response to client;
+
+  |Client (Web/Mobile)|
+  :Show confirmation / pending state;
+
+  |Async Layer|
+  :Outbox Relay polls pending events;
+  :Publish event to Message Broker\n(Kafka/RabbitMQ/SQS);
+
+  if (Publish success?) then (yes)
+    |Data Layer|
+    :Mark outbox row PUBLISHED;
+  else (no)
+    |Async Layer|
+    :Increment retry count + backoff;
+    :Move to DLQ after max retries;
+  endif
+
+  |Async Layer|
+  fork
+    :Notification Worker consumes event;
+    |External Integrations|
+    :Send Email/SMS/Push;
+  fork again
+    :Analytics Worker consumes event;
+    |Data Layer|
+    :Store metrics/event stream;
+  fork again
+    :Inventory/State Worker consumes event;
+    |Data Layer|
+    :Update materialized view/cache;
+  end fork
+
+  |Core Services|
+  :Expose final status via\nGET /orders/{id} or websocket update;
+
+  |Client (Web/Mobile)|
+  :Poll/subscribe and display final state;
+  stop
+endif
+
+legend right
+  <b>Interview Keywords</b>
+  | Component | Why it exists |
+  | CDN/WAF | Low latency + edge security |
+  | API Gateway | Routing, auth, throttling, observability |
+  | Redis Cache | Fast reads, reduced DB load |
+  | OLTP DB | Transactional source of truth |
+  | Outbox + Broker | Reliable async event delivery |
+  | Workers | Decouple slow/non-critical work |
+  | DLQ | Isolate poison messages |
+  | Idempotency key | Safe retries for write APIs |
+endlegend
+
+legend bottom
+  <b>NFRs to mention in interview</b>
+  - Availability target (99.9/99.99), P95 latency, RPS assumptions
+  - Strong consistency for money/inventory, eventual consistency for projections
+  - Multi-AZ, backups, monitoring, tracing, alerting, and rate limits
+endlegend
+
+@enduml

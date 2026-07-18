@@ -1,0 +1,141 @@
+@startuml OnlineApplicationHLDArchitecture
+!theme plain
+left to right direction
+skinparam backgroundColor #FAFAFA
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam componentStyle rectangle
+
+skinparam rectangle {
+  BorderColor #3568A8
+  FontColor #1F1F1F
+  BackgroundColor #EEF5FF
+}
+
+skinparam database {
+  BorderColor #8A6D1F
+  FontColor #1F1F1F
+  BackgroundColor #FFF7DF
+}
+
+skinparam queue {
+  BorderColor #8C3A6D
+  FontColor #1F1F1F
+  BackgroundColor #FCEAF4
+}
+
+skinparam cloud {
+  BorderColor #2D7D78
+  FontColor #1F1F1F
+  BackgroundColor #E8FAF8
+}
+
+title <b>High-Level Design: Online Application</b>\n<size:12><color:#555555>Generic interview-ready architecture</color></size>
+
+actor "Web/Mobile User" as User
+
+rectangle "Edge Layer" as Edge {
+  rectangle "DNS + CDN" as CDN
+  rectangle "WAF + DDoS Protection" as WAF
+  rectangle "Rate Limiter" as RL
+}
+
+rectangle "Application Layer" as App {
+  rectangle "API Gateway / Load Balancer" as APIGW
+
+  rectangle "Auth Service" as Auth
+  rectangle "Catalog/Content Service" as Catalog
+  rectangle "Order/Booking Service" as OrderSvc
+  rectangle "Payment Service" as PaySvc
+  rectangle "Notification Service" as NotifSvc
+  rectangle "Search Service" as SearchSvc
+}
+
+rectangle "Data Layer" as Data {
+  database "Primary SQL DB\n(Source of Truth)" as SQL
+  database "Read Replica" as RR
+  database "Redis Cache" as Redis
+  database "Search Index\n(OpenSearch/Elasticsearch)" as SearchDB
+  cloud "Object Storage\n(Images/Videos/Docs)" as Obj
+}
+
+rectangle "Async Layer" as Async {
+  queue "Message Broker\n(Kafka/RabbitMQ/SQS)" as MQ
+  queue "DLQ" as DLQ
+  rectangle "Outbox Relay Worker" as Outbox
+  rectangle "Async Workers\n(Email/SMS/Analytics/Projection)" as Workers
+}
+
+cloud "External Systems" as Ext {
+  cloud "Payment Gateway" as PG
+  cloud "Email/SMS/Push Providers" as Comm
+}
+
+User --> CDN : HTTPS requests
+CDN --> WAF
+WAF --> RL
+RL --> APIGW
+
+APIGW --> Auth
+APIGW --> Catalog
+APIGW --> SearchSvc
+APIGW --> OrderSvc
+APIGW --> PaySvc
+APIGW --> NotifSvc
+
+Catalog --> Redis : read-through cache
+Catalog --> RR : read-heavy queries
+Catalog --> SQL : fallback / writes
+Catalog --> Obj : media URLs
+
+SearchSvc --> SearchDB : full-text + filters
+OrderSvc --> SQL : ACID writes
+PaySvc --> SQL : payment state
+PaySvc --> PG : authorize/capture
+NotifSvc --> Comm : send notifications
+
+' Transactional outbox path for reliable event publishing
+OrderSvc --> SQL : write business row
+OrderSvc --> SQL : write outbox row (PENDING)
+Outbox --> SQL : poll pending outbox rows
+Outbox --> MQ : publish events
+Outbox --> SQL : mark PUBLISHED / increment retry
+
+MQ --> Workers : consume events
+Workers --> SQL : update projections/status
+Workers --> Redis : invalidate/populate cache
+Workers --> SearchDB : index updates
+Workers --> Comm : async notifications
+Workers --> DLQ : failed after max retries
+
+SQL --> RR : replication
+
+note right of APIGW
+  Cross-cutting concerns:
+  - AuthN/AuthZ
+  - Correlation ID
+  - Throttling
+  - Request validation
+end note
+
+note bottom of Data
+  Storage strategy:
+  - SQL for transactions
+  - Redis for low-latency hot data
+  - Search index for query-heavy APIs
+  - Object storage for media blobs
+end note
+
+legend right
+  <b>Interview Highlights</b>
+  | Concern | Design choice |
+  | Availability | Multi-AZ + health checks + autoscaling |
+  | Latency | CDN + cache + read replicas |
+  | Consistency | Strong for payments/inventory, eventual for projections |
+  | Reliability | Outbox + retries + DLQ |
+  | Scalability | Stateless services + horizontal workers |
+  | Security | WAF, TLS, RBAC, secrets management |
+endlegend
+
+@enduml
+
