@@ -1,4 +1,4 @@
-# PostApiSolutionParallelFlow (GitHub Renderable)
+# PostApiSolutionParallelFlow
 
 ```mermaid
 flowchart TD

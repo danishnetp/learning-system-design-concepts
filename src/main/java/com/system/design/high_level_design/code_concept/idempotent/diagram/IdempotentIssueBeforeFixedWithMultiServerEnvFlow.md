@@ -1,4 +1,4 @@
-# MultiServerIdempotentIssueFlow (GitHub Renderable)
+# MultiServerIdempotentIssueFlow
 
 ```mermaid
 flowchart TD

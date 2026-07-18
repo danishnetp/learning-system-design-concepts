@@ -1,4 +1,4 @@
-# PostApiSolutionSequenceFlow (GitHub Renderable)
+# PostApiSolutionSequenceFlow
 
 ```mermaid
 flowchart TD

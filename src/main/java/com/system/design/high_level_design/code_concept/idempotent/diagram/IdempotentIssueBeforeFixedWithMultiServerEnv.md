@@ -1,4 +1,4 @@
-# MultiServerIdempotentIssue (GitHub Renderable)
+# MultiServerIdempotentIssue
 
 ```mermaid
 sequenceDiagram

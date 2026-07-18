@@ -1,4 +1,4 @@
-# PostApiIssueParallel (GitHub Renderable)
+# PostApiIssueParallel
 
 ```mermaid
 sequenceDiagram

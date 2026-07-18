@@ -1,4 +1,4 @@
-# MultiServerIdempotentWithCache (GitHub Renderable)
+# MultiServerIdempotentWithCache
 
 ```mermaid
 sequenceDiagram

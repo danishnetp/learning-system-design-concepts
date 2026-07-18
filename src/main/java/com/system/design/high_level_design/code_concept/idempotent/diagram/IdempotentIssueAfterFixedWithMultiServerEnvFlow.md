@@ -1,4 +1,4 @@
-# MultiServerIdempotentWithCacheFlow (GitHub Renderable)
+# MultiServerIdempotentWithCacheFlow
 
 ```mermaid
 flowchart TD

@@ -1,4 +1,4 @@
-# PostApiSolutionSequence (GitHub Renderable)
+# PostApiSolutionSequence
 
 ```mermaid
 sequenceDiagram
