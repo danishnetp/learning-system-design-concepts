@@ -257,3 +257,198 @@ flowchart LR
 ## 30-second trade-off summary to speak in interview
 
 "My design optimizes for correctness on critical writes and scalability on reads. I use SQL and transactional outbox for reliable state changes, while caches, read replicas, and async workers reduce latency and absorb spikes. This introduces operational complexity, so I mitigate with observability, retries, DLQ, and idempotency. I would evolve from simpler deployment (single region, fewer services) to more distributed architecture only when scale and reliability targets demand it."
+
+## Amazon/Flipkart-grade improvements (marketplace-scale design)
+
+If you want to explain this as a large e-commerce marketplace (Amazon/Flipkart style), add these components and flows.
+
+### What changes from generic HLD to marketplace HLD
+- Add **Marketplace domain services**: Seller, Catalog ingestion, Pricing, Promotion, Inventory reservation, Cart, Checkout, Delivery promise, Returns.
+- Add **Personalization layer**: Recommendations, ranking, user behavior features.
+- Add **High-throughput event streaming** for clickstream, order events, and inventory events.
+- Add **Search relevance pipeline**: ingestion, indexing, ranking, A/B experimentation.
+- Add **Operational controls**: fraud/risk scoring, anti-abuse, observability-by-default, replay pipelines.
+
+---
+
+## Marketplace-scale architecture diagram (GitHub renderable)
+
+```mermaid
+flowchart LR
+    U[Customer App/Web] --> EDGE[CDN + WAF + Bot Shield + Rate Limit]
+    EDGE --> GW[API Gateway]
+
+    GW --> AUTH[Auth/Identity]
+    GW --> CAT[Catalog API]
+    GW --> SEARCH[Search API]
+    GW --> CART[Cart Service]
+    GW --> CHECKOUT[Checkout Service]
+    GW --> ORDER[Order Service]
+    GW --> PAY[Payment Service]
+    GW --> USER[Profile/Address Service]
+
+    subgraph MarketDomain[Marketplace Domain]
+      SELLER[Seller Service]
+      INGEST[Catalog Ingestion]
+      PRICE[Pricing Service]
+      PROMO[Promotion/Coupon Service]
+      INV[Inventory Service]
+      RESV[Inventory Reservation]
+      ETA[Delivery Promise/ETA Service]
+      SHIP[Shipping/Logistics Service]
+      RETURN[Returns/Refund Service]
+    end
+
+    CAT --> PRICE
+    CAT --> PROMO
+    CHECKOUT --> ETA
+    CHECKOUT --> RESV
+    ORDER --> INV
+    ORDER --> SHIP
+    ORDER --> RETURN
+
+    subgraph DataLayer[Data + Search + Cache]
+      SQL[(Order/Payment SQL)]
+      INVDB[(Inventory DB)]
+      REDIS[(Redis Cache)]
+      IDX[(Search Index)]
+      OBJ[(Object Storage)]
+      FEAT[(Feature Store)]
+    end
+
+    CAT --> REDIS
+    SEARCH --> IDX
+    ORDER --> SQL
+    PAY --> SQL
+    INV --> INVDB
+    CAT --> OBJ
+
+    subgraph Personalization[Relevance + Personalization]
+      REC[Recommendation Service]
+      RANK[Ranking Service]
+      EXP[Experimentation/A-B Service]
+    end
+
+    GW --> REC
+    SEARCH --> RANK
+    REC --> FEAT
+    RANK --> FEAT
+    EXP --> RANK
+
+    subgraph AsyncBackbone[Async Backbone]
+      OUTBOX[Transactional Outbox]
+      RELAY[Outbox Relay]
+      MQ[[Event Bus / Kafka]]
+      WORKERS[Async Workers]
+      DLQ[[DLQ]]
+      STREAM[Stream Processing]
+    end
+
+    ORDER --> OUTBOX
+    OUTBOX --> RELAY --> MQ
+    MQ --> WORKERS
+    MQ --> STREAM
+    WORKERS --> REDIS
+    WORKERS --> IDX
+    WORKERS --> INVDB
+    WORKERS --> DLQ
+
+    subgraph External[External Integrations]
+      PGW[Payment Gateway]
+      NOTIF[Email/SMS/Push Provider]
+      LOGI[3P Logistics / Courier]
+      FRAUD[Fraud Detection]
+    end
+
+    PAY --> PGW
+    WORKERS --> NOTIF
+    SHIP --> LOGI
+    CHECKOUT --> FRAUD
+
+    classDef edge fill:#e8f5e9,stroke:#4caf50,color:#1f1f1f;
+    classDef svc fill:#e3f2fd,stroke:#1e88e5,color:#1f1f1f;
+    classDef data fill:#fff8e1,stroke:#ffb300,color:#1f1f1f;
+    classDef async fill:#fce4ec,stroke:#d81b60,color:#1f1f1f;
+    classDef ext fill:#e0f7fa,stroke:#00897b,color:#1f1f1f;
+
+    class EDGE edge;
+    class GW,AUTH,CAT,SEARCH,CART,CHECKOUT,ORDER,PAY,USER,SELLER,INGEST,PRICE,PROMO,INV,RESV,ETA,SHIP,RETURN,REC,RANK,EXP svc;
+    class SQL,INVDB,REDIS,IDX,OBJ,FEAT data;
+    class OUTBOX,RELAY,MQ,WORKERS,DLQ,STREAM async;
+    class PGW,NOTIF,LOGI,FRAUD ext;
+```
+
+---
+
+## What to say for Amazon/Flipkart interview depth
+
+### 1) Catalog and seller scale
+- Separate **seller onboarding** and **catalog ingestion** from customer-facing read APIs.
+- Pre-validate and normalize product data before indexing.
+- Use async pipelines for media processing and catalog enrichment.
+
+### 2) Price and promotion correctness
+- Price is often dynamic (base + seller + campaign + coupon + user segment).
+- Compute final payable price in checkout with deterministic rule ordering.
+- Keep audit trail for price decisions and promotion application.
+
+### 3) Inventory consistency
+- Use **reservation** during checkout with TTL (soft lock).
+- Confirm reservation on successful payment; release on timeout/failure.
+- Strong consistency for stock decrement path, eventual consistency for stock display.
+
+### 4) Checkout reliability
+- Use idempotency keys for `place-order` and payment callbacks.
+- Keep order + outbox in single transaction.
+- Make downstream operations async (invoice, notifications, analytics).
+
+### 5) Search and relevance
+- Separate online serving (`SEARCH API`) from offline/stream indexing.
+- Relevance ranking combines text score + popularity + availability + personalization.
+- A/B testing service controls ranking models and rollout.
+
+### 6) Personalization and recommendations
+- Feature store provides low-latency user/item features.
+- Candidate generation + ranking stage architecture.
+- Fall back to popular/trending when personalization signals are missing.
+
+### 7) Returns and reverse logistics
+- Model return eligibility rules (window, category, condition, seller policy).
+- Decouple reverse pickup/refund workflows using events and state machine.
+- Refund path should be idempotent and auditable.
+
+---
+
+## Marketplace-specific trade-offs interviewers ask
+
+### A) Pre-compute vs real-time compute (price, ETA, recommendations)
+- **Pre-compute:** lower latency, higher storage/staleness risk.
+- **Real-time:** fresh results, higher compute cost/latency.
+- Practical answer: hybrid (pre-compute base features, real-time final adjustments).
+
+### B) Inventory reservation strictness
+- **Strict lock:** fewer oversells, may reduce conversion during high contention.
+- **Soft lock with TTL:** better UX throughput, needs compensating logic.
+- Practical answer: soft lock + reconciliation + seller-side safety buffers.
+
+### C) Search freshness vs indexing cost
+- **Near real-time indexing:** fresher search, higher infra cost.
+- **Batch indexing:** cheaper, stale search window.
+- Practical answer: high-priority updates (price/stock) near real-time, others batched.
+
+### D) Single checkout orchestration service vs distributed saga
+- **Central orchestrator:** simpler control flow, possible bottleneck.
+- **Saga/choreography:** scalable/flexible, harder debugging.
+- Practical answer: start orchestrator-led saga, evolve based on team/service maturity.
+
+### E) Own logistics vs 3P logistics integration
+- **Own logistics:** better control and potentially better SLA, higher capex/ops complexity.
+- **3P logistics:** faster launch, less control over delivery quality.
+- Practical answer: hybrid by region/category and SLA requirement.
+
+---
+
+## 60-second Amazon/Flipkart style summary
+
+"At marketplace scale, I split the system into customer-facing APIs and heavy back-office pipelines like seller onboarding, catalog ingestion, and search indexing. Checkout is reliability-first: idempotent APIs, transactional outbox, and event-driven downstream processing. Inventory uses reservation with TTL to minimize oversell while maintaining conversion. Search and recommendations are separate relevance systems with feature store + A/B testing. I keep strong consistency for payment/order/inventory commit paths and eventual consistency for projections, personalization, and notifications."
+
