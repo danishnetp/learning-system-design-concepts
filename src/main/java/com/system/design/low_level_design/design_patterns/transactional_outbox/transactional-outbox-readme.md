@@ -2,6 +2,8 @@
 
 This package contains a runnable Java example: `TransactionalOutboxPatternExample`.
 
+> High-level architecture diagram (GitHub renderable): [`transactional-outbox-high-level-diagram.md`](./transactional-outbox-high-level-diagram.md)
+
 ## 1) Problem first (what interviewers expect)
 
 ### Problem statement
