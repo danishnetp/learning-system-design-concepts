@@ -2,14 +2,27 @@
 
 > GitHub-renderable architecture diagram: [`design-hld-online-applications-diagram.md`](./design-hld-online-applications-diagram.md)
 
-This document is a practical blueprint for system design interviews where the prompt is generic, for example:
-- Design an online shopping application
-- Design a food delivery application
-- Design an online learning platform
-- Design a social media application
-- Design an online booking platform
+## How to use both files (synced reading order)
 
-Use this guide as a reusable framework. In interviews, you will adapt the same steps to the domain.
+Use these two files together in this sequence:
+
+1. **Start here** (`design-hld-online-applications.md`) for interview structure:
+   - requirements clarification
+   - capacity estimation
+   - API and data model framing
+   - architecture and trade-off checklist
+2. **Then open** [`design-hld-online-applications-diagram.md`](./design-hld-online-applications-diagram.md) for deep dives:
+   - diagram component explanation
+   - marketplace (Amazon/Flipkart-style) extension
+   - scalability patterns, failure handling, and interview Q&A
+
+### Topic mapping between both files
+
+- **Requirements, estimation, API-first approach:** this file
+- **Diagram walkthrough + keywords (`CDN`, `WAF`, `DLQ`, outbox):** companion diagram file
+- **Marketplace-scale expansion:** companion diagram file
+- **Operational depth (locking, replication, scaling triggers, failures):** companion diagram file
+- **Interview flow/checklist:** this file
 
 ---
 

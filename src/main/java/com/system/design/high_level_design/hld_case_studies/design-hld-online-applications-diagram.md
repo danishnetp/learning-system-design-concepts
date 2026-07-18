@@ -1,55 +1,28 @@
 # Online Application HLD Diagram
 
-```mermaid
-flowchart LR
-    U[Web/Mobile User] --> CDN[CDN]
-    CDN --> WAF[WAF + DDoS]
-    WAF --> RL[Rate Limiter]
-    RL --> GW[API Gateway / Load Balancer]
+> Companion guide: [`design-hld-online-applications.md`](./design-hld-online-applications.md)
 
-    GW --> AUTH[Auth Service]
-    GW --> CAT[Catalog/Content Service]
-    GW --> SEARCH[Search Service]
-    GW --> ORDER[Order/Booking Service]
-    GW --> PAY[Payment Service]
-    GW --> NOTIF[Notification Service]
+## How this file is synced with the main HLD guide
 
-    CAT --> REDIS[(Redis Cache)]
-    CAT --> RR[(Read Replica)]
-    CAT --> SQL[(Primary SQL DB)]
-    SEARCH --> IDX[(Search Index)]
-    ORDER --> SQL
-    PAY --> SQL
+Use this file as the **deep-dive companion** to the main guide.
 
-    ORDER --> OUTBOX[Write Outbox Row PENDING]
-    OUTBOX --> RELAY[Outbox Relay Worker]
-    RELAY --> MQ[[Message Broker]]
-    RELAY --> SQL
+1. Read [`design-hld-online-applications.md`](./design-hld-online-applications.md) first for interview flow and structure.
+2. Read this file second for detailed architecture explanation, scaling decisions, failure playbooks, and Q&A.
 
-    MQ --> WORKERS[Async Workers]
-    WORKERS --> REDIS
-    WORKERS --> IDX
-    WORKERS --> SQL
-    WORKERS --> DLQ[[DLQ]]
+### Scope split (to avoid confusion)
 
-    PAY --> PGW[External Payment Gateway]
-    NOTIF --> COMM[Email/SMS/Push Provider]
-    WORKERS --> COMM
+- **Main guide (`design-hld-online-applications.md`)**
+  - requirement clarification
+  - capacity estimation
+  - API-first discussion
+  - core architecture and interview checklist
+- **This diagram guide (`design-hld-online-applications-diagram.md`)**
+  - component-by-component breakdown
+  - keyword glossary (`WAF`, `DDoS`, `DLQ`, outbox, etc.)
+  - marketplace-scale extension (Amazon/Flipkart style)
+  - advanced scalability options, locking, replication, failures, Q&A
 
-    SQL --> RR
-
-    classDef edge fill:#e8f5e9,stroke:#4caf50,color:#1f1f1f;
-    classDef app fill:#e3f2fd,stroke:#1e88e5,color:#1f1f1f;
-    classDef data fill:#fff8e1,stroke:#ffb300,color:#1f1f1f;
-    classDef async fill:#fce4ec,stroke:#d81b60,color:#1f1f1f;
-    classDef ext fill:#e0f7fa,stroke:#00897b,color:#1f1f1f;
-
-    class CDN,WAF,RL edge;
-    class GW,AUTH,CAT,SEARCH,ORDER,PAY,NOTIF app;
-    class SQL,RR,REDIS,IDX data;
-    class OUTBOX,RELAY,MQ,WORKERS,DLQ async;
-    class PGW,COMM ext;
-```
+---
 
 ## How to explain this in interview
 
@@ -271,7 +244,7 @@ If you want to explain this as a large e-commerce marketplace (Amazon/Flipkart s
 
 ---
 
-## Marketplace-scale architecture diagram (GitHub renderable)
+## Marketplace-scale architecture diagram
 
 ```mermaid
 flowchart LR
@@ -543,14 +516,14 @@ Use these as "next evolution" points in interview once baseline architecture is 
 
 ## Scaling trigger matrix (what to add and when)
 
-| Symptom | First move | Next move |
-|---|---|---|
-| p95 read latency rising | Add Redis + query/index tuning | Add read replicas + CQRS read models |
-| DB write CPU saturation | Batch non-critical writes + tune indexes | Shard write path by key |
-| Queue lag growing | Scale consumer groups | Partition topics + priority queues |
-| Overselling during sales | Add reservation TTL + safety stock | SKU-level serialization / reservation queues |
-| Global latency complaints | Multi-CDN + geo routing | Multi-region active-active for reads |
-| Search staleness | Priority indexing for stock/price | Split ingest/search clusters |
+| Symptom                   | First move                               | Next move                                    |
+|---------------------------|------------------------------------------|----------------------------------------------|
+| p95 read latency rising   | Add Redis + query/index tuning           | Add read replicas + CQRS read models         |
+| DB write CPU saturation   | Batch non-critical writes + tune indexes | Shard write path by key                      |
+| Queue lag growing         | Scale consumer groups                    | Partition topics + priority queues           |
+| Overselling during sales  | Add reservation TTL + safety stock       | SKU-level serialization / reservation queues |
+| Global latency complaints | Multi-CDN + geo routing                  | Multi-region active-active for reads         |
+| Search staleness          | Priority indexing for stock/price        | Split ingest/search clusters                 |
 
 ---
 
@@ -639,4 +612,3 @@ Use these as "next evolution" points in interview once baseline architecture is 
 ## 2-minute interview script using this Q&A
 
 "I start at edge with CDN, WAF, and rate limiting to protect latency and security. API gateway routes to stateless services. For correctness, SQL is source of truth for order/payment paths. For scale, reads are optimized through Redis, replicas, and a separate search index. For reliability, I use transactional outbox so DB writes and events stay consistent; relay publishes to broker and workers process side effects asynchronously. Failures are handled with retries, idempotency, and DLQ. As traffic grows, I evolve with sharding, CQRS read models, partitioned topics, and multi-region strategies based on latency and availability goals."
-
