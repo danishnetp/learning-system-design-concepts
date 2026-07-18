@@ -46,7 +46,7 @@ start
 if (Already\nprocessed?) then (YES)
     :Return existing\norderId (idempotent);
     note right
-        Prevents duplicate orders
+      *+  Prevents duplicate orders
         on client retry / network timeout
     end note
     stop
