@@ -297,13 +297,13 @@ sequenceDiagram
 
 #### Quick Comparison
 
-| Aspect | Polling | Long Polling | WebSocket |
-|---|---|---|---|
-| Latency | Medium to high (poll interval based) | Lower (server responds when event arrives) | Low (near real-time bi-directional) |
-| Bandwidth efficiency | Lower | Better | Best for continuous real-time traffic |
-| Server load pattern | Many short requests | Fewer but longer-lived requests | Fewer requests, many persistent connections |
-| Implementation complexity | Low | Medium | Medium to high |
-| Best fit | Low-scale / less real-time features | Near real-time on HTTP without WebSocket | High-scale real-time chat and live updates |
+| Aspect                    | Polling                              | Long Polling                               | WebSocket                                   |
+|---------------------------|--------------------------------------|--------------------------------------------|---------------------------------------------|
+| Latency                   | Medium to high (poll interval based) | Lower (server responds when event arrives) | Low (near real-time bi-directional)         |
+| Bandwidth efficiency      | Lower                                | Better                                     | Best for continuous real-time traffic       |
+| Server load pattern       | Many short requests                  | Fewer but longer-lived requests            | Fewer requests, many persistent connections |
+| Implementation complexity | Low                                  | Medium                                     | Medium to high                              |
+| Best fit                  | Low-scale / less real-time features  | Near real-time on HTTP without WebSocket   | High-scale real-time chat and live updates  |
 
 ### Client-to-Server Protocols
 
@@ -325,15 +325,6 @@ sequenceDiagram
   - message fanout
   - async delivery processing
   - retries and dead-letter handling
-
-### Notification and Media Protocols
-
-- **FCM / APNs**
-  - push notifications to mobile devices
-- **HTTPS upload to object storage**
-  - media upload and download
-- **CDN over HTTPS**
-  - fast media delivery across regions
 
 ### Recommended Protocol Split
 
