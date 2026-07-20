@@ -183,6 +183,7 @@ flowchart LR
 #### User Mapping Service Responsibilities
 
 - Maintain `userId -> serverId` mapping for currently connected users
+- Use **Zookeeper** as a coordination store to keep/update user-to-server connection records across chat servers
 - Update mapping on connect, reconnect, heartbeat timeout, and disconnect
 - Provide fast lookup for message routing
 - Optionally store additional metadata: device id, last seen, and connection timestamp
@@ -195,6 +196,26 @@ flowchart LR
 - **Message**: sender, conversation id, content, timestamp, status
 - **Receipt**: delivered/read acknowledgements
 - **Attachment**: media metadata and storage URL
+
+### Message Body
+
+Required fields for chat message payload:
+
+- `from`: sender user id
+- `to`: receiver user id (or conversation id for group chat)
+- `msg`: message content
+- `type`: message type (for example: `text`, `image`, `video`, `file`)
+
+Example payload:
+
+```json
+{
+  "from": "user_1001",
+  "to": "user_2002",
+  "msg": "Hi, are you available for a call?",
+  "type": "text"
+}
+```
 
 ### Important Design Choices
 
