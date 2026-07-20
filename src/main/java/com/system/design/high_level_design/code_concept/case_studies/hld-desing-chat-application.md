@@ -225,126 +225,6 @@ Example payload:
 - **Idempotency key** for safe retries and duplicate prevention
 - **Cursor-based pagination** for message history
 
-### DB Decision
-
-#### What data we need to read frequently
-
-- `User1 <-> User2` recent messages
-- 1:1 chat history
-- Group chat history
-- User profile
-- Message search
-
-#### Recommended DB Choice
-
-Use a **polyglot persistence** approach instead of forcing everything into one database.
-
-1. **Primary message store: wide-column NoSQL DB**
-   - Good choices: **Cassandra**, **ScyllaDB**, **DynamoDB**
-   - Best for:
-     - 1:1 chat history
-     - group chat history
-     - high write throughput
-     - low-latency reads by conversation
-
-2. **User profile store: relational DB or document DB**
-   - Good choices: **PostgreSQL**, **MySQL**, or **MongoDB**
-   - Best for:
-     - user profile
-     - account settings
-     - device metadata
-     - admin/reporting use cases
-
-3. **Search store: search engine**
-   - Good choices: **Elasticsearch** or **OpenSearch**
-   - Best for:
-     - keyword search in chat history
-     - filtering by sender, time range, type
-     - full-text search
-
-4. **Cache layer**
-   - Good choice: **Redis**
-   - Best for:
-     - recent conversations
-     - presence/session data
-     - hot user profile data
-
-#### Why NoSQL is a strong fit for messages
-
-Chat messages are usually accessed by:
-
-- `conversationId`
-- time order
-- recent message pagination
-
-Typical query pattern is simple:
-
-- get recent 50 messages for a conversation
-- get next page before a timestamp/message id
-- append a new message
-
-This is an excellent fit for partitioned NoSQL tables such as:
-
-- partition key: `conversationId`
-- clustering key: `timestamp` or `messageId`
-
-#### Is there any complex join query?
-
-Usually, **no complex joins are needed on the hot message path**.
-
-For chat systems, we intentionally avoid expensive joins such as:
-
-- joining messages with user profile on every read
-- joining group membership, receipts, and attachments in a single runtime query
-
-Instead, common design choices are:
-
-- denormalize small display data where needed
-- fetch profile separately from profile store/cache
-- precompute conversation/member metadata
-- use async pipelines for analytics and reporting
-
-#### Low latency requirement
-
-For low latency, the best practical design is:
-
-- **NoSQL message store** for message history
-- **Redis cache** for recent messages and active sessions
-- **WebSocket gateway** for real-time delivery
-- data partitioned by `conversationId`
-- read path optimized for sequential pagination
-
-This avoids heavy joins and keeps message reads fast.
-
-#### Search capability
-
-Search is usually **not served directly from the primary message DB** at scale.
-
-Recommended approach:
-
-1. Write message to primary message store
-2. Publish event to broker
-3. Index searchable fields into **Elasticsearch/OpenSearch**
-4. Run search queries from search engine
-
-This gives:
-
-- full-text search
-- filtering by sender or group
-- time-range search
-- better relevance and ranking support
-
-#### Final Recommendation
-
-- **Messages / chat history** -> **Cassandra / ScyllaDB / DynamoDB**
-- **User profile** -> **PostgreSQL / MySQL / MongoDB**
-- **Search** -> **Elasticsearch / OpenSearch**
-- **Cache** -> **Redis**
-
-If interviewer asks for a single strongest answer, a good practical answer is:
-
-> Use a NoSQL database like Cassandra for chat messages because reads are mostly by conversation and time range, avoid complex joins on the hot path, keep user profile in a separate store, and use Elasticsearch for search.
-
 ---
 
 ## 4) Protocols
@@ -526,6 +406,184 @@ sequenceDiagram
 - Use **WebSocket** for persistent real-time chat
 - Use **gRPC** for internal low-latency service calls
 - Use **event streaming** for asynchronous fanout and notification workflows
+
+---
+
+## 5) DB Decision
+
+### What data we need to read frequently
+
+- `User1 <-> User2` recent messages
+- 1:1 chat history
+- Group chat history
+- User profile
+- Message search
+
+### Recommended DB Choice
+
+Use a **polyglot persistence** approach instead of forcing everything into one database.
+
+1. **Primary message store: wide-column NoSQL DB**
+   - Good choices: **Cassandra**, **ScyllaDB**, **DynamoDB**
+   - Best for:
+     - 1:1 chat history
+     - group chat history
+     - high write throughput
+     - low-latency reads by conversation
+
+2. **User profile store: relational DB or document DB**
+   - Good choices: **PostgreSQL**, **MySQL**, or **MongoDB**
+   - Best for:
+     - user profile
+     - account settings
+     - device metadata
+     - admin/reporting use cases
+
+3. **Search store: search engine**
+   - Good choices: **Elasticsearch** or **OpenSearch**
+   - Best for:
+     - keyword search in chat history
+     - filtering by sender, time range, type
+     - full-text search
+
+4. **Cache layer**
+   - Good choice: **Redis**
+   - Best for:
+     - recent conversations
+     - presence/session data
+     - hot user profile data
+
+### Why NoSQL is a strong fit for messages
+
+Chat messages are usually accessed by:
+
+- `conversationId`
+- time order
+- recent message pagination
+
+Typical query pattern is simple:
+
+- get recent 50 messages for a conversation
+- get next page before a timestamp/message id
+- append a new message
+
+This is an excellent fit for partitioned NoSQL tables such as:
+
+- partition key: `conversationId`
+- clustering key: `timestamp` or `messageId`
+
+### Horizontal Sharding Example for Messages
+
+Suppose the message record is:
+
+- `messageId`
+- `from`
+- `to`
+- `msg`
+
+For 1:1 chat, `from` and `to` can be used to derive a stable shard key.
+
+#### Example record
+
+```json
+{
+  "messageId": "msg_90001",
+  "from": "user_1001",
+  "to": "user_2002",
+  "msg": "Hi, are you available for a call?"
+}
+```
+
+#### Better partition idea
+
+Do not shard by only `from` or only `to`, because the same conversation may spread across different shards.
+
+Instead, derive a stable conversation key from both values:
+
+```text
+conversationKey = min(from, to) + "#" + max(from, to)
+shard = hash(conversationKey) % N
+```
+
+Example:
+
+```text
+from = user_1001
+to   = user_2002
+
+conversationKey = user_1001#user_2002
+shard = hash(user_1001#user_2002) % 4 = shard_2
+```
+
+Then all messages between `user_1001` and `user_2002` go to the same shard.
+
+#### Example horizontal shard distribution
+
+| messageId | from | to | msg | derived key | shard |
+|---|---|---|---|---|---|
+| `msg_90001` | `user_1001` | `user_2002` | `Hi` | `user_1001#user_2002` | `shard_2` |
+| `msg_90002` | `user_2002` | `user_1001` | `Hello` | `user_1001#user_2002` | `shard_2` |
+| `msg_90003` | `user_1001` | `user_3003` | `Ping` | `user_1001#user_3003` | `shard_1` |
+| `msg_90004` | `user_4004` | `user_5005` | `Meeting at 5` | `user_4004#user_5005` | `shard_3` |
+
+This is horizontal sharding because different conversations are spread across multiple shards, while one conversation remains colocated for fast reads.
+
+### Is there any complex join query?
+
+Usually, **no complex joins are needed on the hot message path**.
+
+For chat systems, we intentionally avoid expensive joins such as:
+
+- joining messages with user profile on every read
+- joining group membership, receipts, and attachments in a single runtime query
+
+Instead, common design choices are:
+
+- denormalize small display data where needed
+- fetch profile separately from profile store/cache
+- precompute conversation/member metadata
+- use async pipelines for analytics and reporting
+
+### Low latency requirement
+
+For low latency, the best practical design is:
+
+- **NoSQL message store** for message history
+- **Redis cache** for recent messages and active sessions
+- **WebSocket gateway** for real-time delivery
+- data partitioned by `conversationId`
+- read path optimized for sequential pagination
+
+This avoids heavy joins and keeps message reads fast.
+
+### Search capability
+
+Search is usually **not served directly from the primary message DB** at scale.
+
+Recommended approach:
+
+1. Write message to primary message store
+2. Publish event to broker
+3. Index searchable fields into **Elasticsearch/OpenSearch**
+4. Run search queries from search engine
+
+This gives:
+
+- full-text search
+- filtering by sender or group
+- time-range search
+- better relevance and ranking support
+
+### Final Recommendation
+
+- **Messages / chat history** -> **Cassandra / ScyllaDB / DynamoDB**
+- **User profile** -> **PostgreSQL / MySQL / MongoDB**
+- **Search** -> **Elasticsearch / OpenSearch**
+- **Cache** -> **Redis**
+
+If interviewer asks for a single strongest answer, a good practical answer is:
+
+> Use a NoSQL database like Cassandra for chat messages because reads are mostly by conversation and time range, avoid complex joins on the hot path, keep user profile in a separate store, and use Elasticsearch for search.
 
 ---
 
