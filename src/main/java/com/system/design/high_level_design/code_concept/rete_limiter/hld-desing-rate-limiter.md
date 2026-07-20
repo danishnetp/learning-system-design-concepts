@@ -86,20 +86,108 @@ flowchart LR
 **Pros**: allows burst traffic up to bucket size, smooth on average
 **Cons**: bursts can still stress downstream if bucket is large
 
+#### Implementation
+
+```java
+class TokenBucketRateLimiter {
+    private final long capacity;       // max tokens
+    private final double refillRate;   // tokens per second
+    private double tokens;
+    private long lastRefillTime;
+
+    public synchronized boolean allowRequest() {
+        refill();
+        if (tokens >= 1) {
+            tokens--;
+            return true;  // allowed
+        }
+        return false;     // rejected 429
+    }
+
+    private void refill() {
+        long now = System.currentTimeMillis();
+        double elapsed = (now - lastRefillTime) / 1000.0;
+        tokens = Math.min(capacity, tokens + elapsed * refillRate);
+        lastRefillTime = now;
+    }
+}
+```
+
 ### 4.2 Leaky Bucket
 
 - Requests enter a queue
 - Queue drains at a fixed rate regardless of incoming rate
 - If queue is full, request is rejected
 
+```mermaid
+flowchart TD
+    R1[Request-1] --> Q
+    R2[Request-2] --> Q
+    RN[Request-N] --> Q
+
+    Q{Queue\nfull?}
+    Q -->|No - enqueue| Bucket[(Leaky Bucket\nQueue)]
+    Q -->|Yes| Deny[Reject 429]
+
+    Bucket -->|drain at fixed rate| Allow[Allow Request\nto Backend]
+```
+
 **Pros**: smooth, predictable output rate
 **Cons**: no burst allowed, added latency from queue
+
+#### Implementation
+
+```java
+class LeakyBucketRateLimiter {
+    private final int capacity;          // max queue size
+    private final long drainIntervalMs;  // ms between draining one request
+    private final Queue<Runnable> queue = new LinkedList<>();
+    private long lastDrainTime = System.currentTimeMillis();
+
+    public synchronized boolean allowRequest(Runnable task) {
+        drain();
+        if (queue.size() < capacity) {
+            queue.add(task);
+            return true;   // enqueued, will be processed at fixed rate
+        }
+        return false;      // queue full, rejected 429
+    }
+
+    private void drain() {
+        long now = System.currentTimeMillis();
+        long elapsed = now - lastDrainTime;
+        int toDrain = (int) (elapsed / drainIntervalMs);
+        for (int i = 0; i < toDrain && !queue.isEmpty(); i++) {
+            queue.poll().run();
+        }
+        lastDrainTime = now;
+    }
+}
+```
 
 ### 4.3 Fixed Window Counter
 
 - Time is divided into fixed windows (e.g. 1 minute)
 - Counter increments per request in the current window
 - Counter resets at the start of each new window
+
+```mermaid
+flowchart LR
+    subgraph Window1[Window 1 - 00:00 to 01:00]
+        C1[count = 80]
+    end
+    subgraph Window2[Window 2 - 01:00 to 02:00]
+        C2[count = 0\nreset]
+    end
+
+    Request --> Check{count < limit?}
+    Check -->|yes| Incr[Increment counter\nAllow request]
+    Check -->|no| Deny[Reject 429]
+
+    Window2 -->|new window starts| Reset[Counter resets to 0]
+```
+
+> ⚠️ Boundary burst: a client can send `limit` requests at 00:59 and another `limit` at 01:01, totalling 2x the intended limit in 2 seconds.
 
 **Pros**: simple to implement
 **Cons**: boundary burst problem — 2x traffic can pass at window edge
@@ -110,6 +198,21 @@ flowchart LR
 - On each request, remove entries older than the window
 - Count remaining entries to check against limit
 
+```mermaid
+flowchart TD
+    Request --> Clean[Remove timestamps\nolder than now - window]
+    Clean --> Count{log count\n< limit?}
+    Count -->|yes| Log[Append timestamp\nAllow request]
+    Count -->|no| Deny[Reject 429]
+
+    subgraph Log_Example[Timestamp Log - window 60s]
+        T1[t=1720000010]
+        T2[t=1720000025]
+        T3[t=1720000040]
+        T4[t=1720000055]
+    end
+```
+
 **Pros**: accurate, no boundary burst
 **Cons**: high memory usage for storing all timestamps
 
@@ -118,6 +221,26 @@ flowchart LR
 - Hybrid of fixed window and sliding log
 - Uses weighted average of current and previous window counts
 - `rate = prev_window_count × (1 - elapsed_fraction) + current_window_count`
+
+```mermaid
+flowchart LR
+    subgraph PrevWindow[Previous Window\ncount = 80]
+        PW[80 requests]
+    end
+    subgraph CurrWindow[Current Window\ncount = 30]
+        CW[30 requests]
+    end
+
+    Elapsed[Elapsed = 40%\nof current window]
+
+    PrevWindow --> Calc[rate = 80 × 0.6 + 30\n= 48 + 30 = 78]
+    CurrWindow --> Calc
+    Elapsed --> Calc
+
+    Calc --> Check{78 < limit 100?}
+    Check -->|yes| Allow[Allow Request]
+    Check -->|no| Deny[Reject 429]
+```
 
 **Pros**: memory efficient, more accurate than fixed window
 **Cons**: approximate, not perfectly accurate
