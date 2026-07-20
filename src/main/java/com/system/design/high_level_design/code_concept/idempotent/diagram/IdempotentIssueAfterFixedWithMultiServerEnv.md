@@ -6,7 +6,7 @@ sequenceDiagram
     actor Client
     participant LB as Load Balancer
     participant S1 as App Server 1
-    participant S2 as App Server 2
+    participant S2 as App Server 2 
     participant Redis as Redis Primary
     participant R1 as Redis Replica 1
     participant DB1 as DB1
