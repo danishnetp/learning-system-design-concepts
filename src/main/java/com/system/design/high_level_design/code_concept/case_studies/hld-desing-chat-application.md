@@ -155,6 +155,57 @@ flowchart LR
 
 ## 4) Protocols
 
+### 4.1 Polling
+
+Polling uses short-lived request/response cycles. The client connects, sends/gets data, disconnects, then reconnects after an interval.
+
+#### Flow
+
+- Client connects to server and sends message request.
+- Server responds quickly, then connection closes.
+- Client reconnects again and sends next message request.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+
+    C->>S: Connect + Send message (Request 1)
+    S-->>C: Response 1
+    Note over C,S: Connection closed (disconnect)
+
+    C->>S: Connect again + Send message (Request 2)
+    S-->>C: Response 2
+    Note over C,S: Connection closed (disconnect)
+```
+
+### 4.2 Long Polling (Pushing)
+
+Long polling keeps a request open for longer time. The server responds when new data is available or timeout occurs, then client reconnects.
+
+#### Flow
+
+- Client connects and sends message/receive request.
+- Server holds connection and waits for new event for a longer duration.
+- Server responds (message/timeout), connection closes.
+- Client reconnects and sends next long-poll request.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+
+    C->>S: Connect + Send message / wait request
+    Note right of S: Hold request for long time
+    S-->>C: Response when new message or timeout
+    Note over C,S: Connection closed (disconnect)
+
+    C->>S: Connect again + Send next long-poll request
+    Note right of S: Hold again
+    S-->>C: Response
+    Note over C,S: Connection closed (disconnect)
+```
+
 ### Client-to-Server Protocols
 
 - **HTTPS / REST**
