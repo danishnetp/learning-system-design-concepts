@@ -519,11 +519,11 @@ Then all messages between `user_1001` and `user_2002` go to the same shard.
 
 #### Example horizontal shard distribution
 
-| messageId | from | to | msg | derived key | shard |
-|---|---|---|---|---|---|
-| `msg_90001` | `user_1001` | `user_2002` | `Hi` | `user_1001#user_2002` | `shard_2` |
-| `msg_90002` | `user_2002` | `user_1001` | `Hello` | `user_1001#user_2002` | `shard_2` |
-| `msg_90003` | `user_1001` | `user_3003` | `Ping` | `user_1001#user_3003` | `shard_1` |
+| messageId   | from        | to          | msg            | derived key           | shard     |
+|-------------|-------------|-------------|----------------|-----------------------|-----------|
+| `msg_90001` | `user_1001` | `user_2002` | `Hi`           | `user_1001#user_2002` | `shard_2` |
+| `msg_90002` | `user_2002` | `user_1001` | `Hello`        | `user_1001#user_2002` | `shard_2` |
+| `msg_90003` | `user_1001` | `user_3003` | `Ping`         | `user_1001#user_3003` | `shard_1` |
 | `msg_90004` | `user_4004` | `user_5005` | `Meeting at 5` | `user_4004#user_5005` | `shard_3` |
 
 This is horizontal sharding because different conversations are spread across multiple shards, while one conversation remains colocated for fast reads.
