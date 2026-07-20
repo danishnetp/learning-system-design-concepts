@@ -247,7 +247,7 @@ sequenceDiagram
     end
 ```
 
-### 4.4 Trade-offs: Polling vs Long Polling
+### 4.4 Trade-offs: Polling vs Long Polling vs WebSocket
 
 #### Polling Trade-offs
 
@@ -279,15 +279,31 @@ sequenceDiagram
 - Can be expensive at very high concurrency
 - Proxies/timeouts can break long-lived requests unexpectedly
 
+#### WebSocket Trade-offs
+
+**Pros**
+
+- Very low latency bi-directional communication
+- Efficient for frequent real-time updates (no per-message reconnect)
+- Lower protocol overhead after connection establishment
+- Ideal for chat, typing indicators, and presence updates
+
+**Cons**
+
+- Requires stateful connection management at scale
+- More complex infrastructure (connection gateways, heartbeats, reconnect strategy)
+- Harder load balancing and sticky-session considerations
+- Some enterprise proxies/firewalls may block or limit WebSocket behavior
+
 #### Quick Comparison
 
-| Aspect | Polling | Long Polling |
-|---|---|---|
-| Latency | Medium to high (poll interval based) | Lower (server responds when event arrives) |
-| Bandwidth efficiency | Lower | Better |
-| Server load pattern | Many short requests | Fewer but longer-lived requests |
-| Implementation complexity | Low | Medium |
-| Best fit | Low-scale / less real-time features | Near real-time on HTTP without WebSocket |
+| Aspect | Polling | Long Polling | WebSocket |
+|---|---|---|---|
+| Latency | Medium to high (poll interval based) | Lower (server responds when event arrives) | Low (near real-time bi-directional) |
+| Bandwidth efficiency | Lower | Better | Best for continuous real-time traffic |
+| Server load pattern | Many short requests | Fewer but longer-lived requests | Fewer requests, many persistent connections |
+| Implementation complexity | Low | Medium | Medium to high |
+| Best fit | Low-scale / less real-time features | Near real-time on HTTP without WebSocket | High-scale real-time chat and live updates |
 
 ### Client-to-Server Protocols
 
