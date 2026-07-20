@@ -206,6 +206,48 @@ sequenceDiagram
     Note over C,S: Connection closed (disconnect)
 ```
 
+### 4.3 Trade-offs: Polling vs Long Polling
+
+#### Polling Trade-offs
+
+**Pros**
+
+- Simple to implement and debug
+- Works with standard HTTP infrastructure
+- Easy retry behavior with short request lifecycle
+
+**Cons**
+
+- Higher request overhead due to frequent reconnects
+- Wastes bandwidth when there is no new data
+- Higher end-to-end latency (message waits until next poll cycle)
+- Increases server and load balancer request count
+
+#### Long Polling Trade-offs
+
+**Pros**
+
+- Lower latency than basic polling for near real-time updates
+- Better bandwidth usage than frequent short polling
+- Still HTTP-compatible (no full WebSocket requirement)
+
+**Cons**
+
+- More complex timeout/reconnect handling
+- Long-held requests increase server connection pressure
+- Can be expensive at very high concurrency
+- Proxies/timeouts can break long-lived requests unexpectedly
+
+#### Quick Comparison
+
+| Aspect | Polling | Long Polling |
+|---|---|---|
+| Latency | Medium to high (poll interval based) | Lower (server responds when event arrives) |
+| Bandwidth efficiency | Lower | Better |
+| Server load pattern | Many short requests | Fewer but longer-lived requests |
+| Implementation complexity | Low | Medium |
+| Best fit | Low-scale / less real-time features | Near real-time on HTTP without WebSocket |
+
 ### Client-to-Server Protocols
 
 - **HTTPS / REST**
