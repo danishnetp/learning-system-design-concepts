@@ -45,6 +45,30 @@ This document captures the high-level design approach for a chat application in 
 - Chat delivery should tolerate retries without duplicate side effects
 - Media should be stored outside the main message database
 
+### Communication Cases
+
+#### Case 1: Peer-to-Peer (P2P) 1:1 Chat
+
+- Flow: `User A -> User B`
+- Limitation: not suitable for scaling because direct connectivity, NAT traversal, and offline delivery become hard to manage centrally.
+
+```mermaid
+flowchart LR
+    A[User A] --> B[User B]
+```
+
+#### Case 2: Service-Mediated 1:1 Chat (P2S2P)
+
+- Flow: `User A -> Chat Service -> User B`
+- Benefit: suitable for scaling in 1:1 chat due to centralized auth, persistence, retries, and observability.
+- Note: group chat still needs additional fanout design (message broker / fanout workers).
+
+```mermaid
+flowchart LR
+    A[User A] --> CS[Chat Service]
+    CS --> B[User B]
+```
+
 ---
 
 ## 2) Back of Envelope
