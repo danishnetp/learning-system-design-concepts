@@ -1,4 +1,4 @@
-rem# CAP Theorem - Simple Deployment View
+# CAP Theorem - Simple Deployment View
 
 ```mermaid
 flowchart LR
@@ -8,11 +8,13 @@ flowchart LR
 
     App --> DB1
     App --> DB2
+    DB1 <--> DB2
 ```
 
-## Meaning
+## Meaning 
 
 - The `Application` is connected to two databases in different regions.
+- `DB1` and `DB2` replicate data between each other.
 - This kind of layout is often used to discuss CAP tradeoffs during network partition.
 - When the India and US sites cannot communicate reliably, the system must choose between consistency and availability.
 
