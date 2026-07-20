@@ -28,3 +28,18 @@ flowchart LR
 - This kind of layout is often used to discuss CAP tradeoffs during network partition.
 - When the India and US sites cannot communicate reliably, the system must choose between consistency and availability.
 
+## CAP Circle View
+
+```mermaid
+flowchart TB
+    C((Consistency\nC))
+    A((Availability\nA))
+    P((Partition Tolerance\nP))
+    CAP((C ∩ A ∩ P\nPractical CAP tradeoff))
+
+    C --- CAP
+    A --- CAP
+    P --- CAP
+```
+
+The center intersection represents the practical design space where a distributed system must choose how to behave under partition.
