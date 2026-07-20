@@ -606,7 +606,10 @@ flowchart TD
     end
 
     subgraph WS_Path[WebSocket Path]
-        CS[Chat Server]
+        WSLB[WebSocket Load Balancer]
+        CS1[Chat Server-1]
+        CS2[Chat Server-2]
+        CSN[Chat Server-N]
         NoSQL[(NoSQL\nMessage Store)]
     end
 
@@ -626,9 +629,18 @@ flowchart TD
     UMS --> Redis1
     UMS --> ZK
 
-    Client -- WebSocket --> CS
-    CS --> UMS
-    CS --> NoSQL
+    Client -- WebSocket --> WSLB
+    WSLB --> CS1
+    WSLB --> CS2
+    WSLB --> CSN
+
+    CS1 --> UMS
+    CS2 --> UMS
+    CSN --> UMS
+
+    CS1 --> NoSQL
+    CS2 --> NoSQL
+    CSN --> NoSQL
 
     Client -- WebSocket --> PS
     PS --> Redis2
@@ -636,14 +648,15 @@ flowchart TD
 
 ### Component Summary
 
-| Component            | Protocol      | Storage           | Notes                                                      |
-|----------------------|---------------|-------------------|------------------------------------------------------------|
-| Load Balancer        | HTTP          | -                 | Routes API requests to backend services                    |
-| Group Service        | HTTP (via LB) | DB                | Manages group/channel metadata                             |
-| User Login Service   | HTTP (via LB) | DB                | Auth, registration, token validation                       |
-| User Mapping Service | HTTP (via LB) | Redis + Zookeeper | Maps `userId -> serverId` using Zookeeper for coordination |
-| Chat Server          | WebSocket     | NoSQL             | Real-time 1:1 and group message delivery                   |
-| Presence Service     | WebSocket     | Redis             | Tracks and serves online/offline status                    |
+| Component               | Protocol      | Storage           | Notes                                                                                           |
+|-------------------------|---------------|-------------------|-------------------------------------------------------------------------------------------------|
+| Load Balancer           | HTTP          | -                 | Routes HTTP API requests to backend services                                                    |
+| Group Service           | HTTP (via LB) | DB                | Manages group/channel metadata                                                                  |
+| User Login Service      | HTTP (via LB) | DB                | Auth, registration, token validation                                                            |
+| User Mapping Service    | HTTP (via LB) | Redis + Zookeeper | Maps `userId -> serverId` using Zookeeper for coordination                                      |
+| WebSocket Load Balancer | WebSocket     | -                 | Distributes WebSocket connections across Chat Server-1..N                                       |
+| Chat Server-1..N        | WebSocket     | NoSQL             | Multiple real-time servers for horizontal scalability; each registers with User Mapping Service |
+| Presence Service        | WebSocket     | Redis             | Tracks and serves online/offline status                                                         |
 
 ---
 
