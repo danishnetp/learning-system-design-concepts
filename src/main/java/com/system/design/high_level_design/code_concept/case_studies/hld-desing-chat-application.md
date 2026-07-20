@@ -636,14 +636,14 @@ flowchart TD
 
 ### Component Summary
 
-| Component | Protocol | Storage | Notes |
-|---|---|---|---|
-| Load Balancer | HTTP | - | Routes API requests to backend services |
-| Group Service | HTTP (via LB) | DB | Manages group/channel metadata |
-| User Login Service | HTTP (via LB) | DB | Auth, registration, token validation |
+| Component            | Protocol      | Storage           | Notes                                                      |
+|----------------------|---------------|-------------------|------------------------------------------------------------|
+| Load Balancer        | HTTP          | -                 | Routes API requests to backend services                    |
+| Group Service        | HTTP (via LB) | DB                | Manages group/channel metadata                             |
+| User Login Service   | HTTP (via LB) | DB                | Auth, registration, token validation                       |
 | User Mapping Service | HTTP (via LB) | Redis + Zookeeper | Maps `userId -> serverId` using Zookeeper for coordination |
-| Chat Server | WebSocket | NoSQL | Real-time 1:1 and group message delivery |
-| Presence Service | WebSocket | Redis | Tracks and serves online/offline status |
+| Chat Server          | WebSocket     | NoSQL             | Real-time 1:1 and group message delivery                   |
+| Presence Service     | WebSocket     | Redis             | Tracks and serves online/offline status                    |
 
 ---
 
