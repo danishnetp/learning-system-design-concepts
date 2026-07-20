@@ -588,6 +588,65 @@ If interviewer asks for a single strongest answer, a good practical answer is:
 ---
 
 
+## 6) Final Architecture Diagram
+
+```mermaid
+flowchart TD
+    Client([Client])
+
+    subgraph HTTP_Path[HTTP Path]
+        LB[Load Balancer]
+        GS[Group Service]
+        ULS[User Login Service]
+        UMS[User Mapping Service]
+        GDB[(Group DB)]
+        ULSDB[(User DB)]
+        Redis1[(Redis)]
+        ZK[Zookeeper\nuserId → serverId]
+    end
+
+    subgraph WS_Path[WebSocket Path]
+        CS[Chat Server]
+        NoSQL[(NoSQL\nMessage Store)]
+    end
+
+    subgraph Presence_Path[Presence Path]
+        PS[Presence Service]
+        Redis2[(Redis\nOnline Status)]
+    end
+
+    Client -- HTTP --> LB
+
+    LB --> GS
+    LB --> ULS
+    LB --> UMS
+
+    GS --> GDB
+    ULS --> ULSDB
+    UMS --> Redis1
+    UMS --> ZK
+
+    Client -- WebSocket --> CS
+    CS --> UMS
+    CS --> NoSQL
+
+    Client -- WebSocket --> PS
+    PS --> Redis2
+```
+
+### Component Summary
+
+| Component | Protocol | Storage | Notes |
+|---|---|---|---|
+| Load Balancer | HTTP | - | Routes API requests to backend services |
+| Group Service | HTTP (via LB) | DB | Manages group/channel metadata |
+| User Login Service | HTTP (via LB) | DB | Auth, registration, token validation |
+| User Mapping Service | HTTP (via LB) | Redis + Zookeeper | Maps `userId -> serverId` using Zookeeper for coordination |
+| Chat Server | WebSocket | NoSQL | Real-time 1:1 and group message delivery |
+| Presence Service | WebSocket | Redis | Tracks and serves online/offline status |
+
+---
+
 ## Summary
 
 For a chat application, the key design goals are real-time delivery, durable message storage, multi-device sync, and scalable fanout. The best protocol mix is usually HTTPS for standard API calls, WebSocket for live messaging, and gRPC or an event bus for internal service communication.
