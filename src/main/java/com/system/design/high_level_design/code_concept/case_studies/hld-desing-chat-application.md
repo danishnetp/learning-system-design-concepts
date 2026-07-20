@@ -85,19 +85,19 @@ flowchart LR
 ### Message Volume
 
 - Daily messages = `50M × 40` = **2,000M = 2 billion messages/day**
-- Average message rate = `2,000,000,000 / 86,400` ≈ **23,148 messages/sec**
+- Average message rate = `2,000,000,000 / 86,400` ~= **23,148 messages/sec**
 
 ### Storage Estimate
 
 - Per-message payload = **100 bytes**
 - Daily payload storage = `2,000,000,000 × 100 bytes` = **200,000,000,000 bytes ~= 200 GB/day**
 - 10-year payload storage = `200 GB × 365 × 10` = **730,000 GB ~= 730 TB (~0.73 PB)**
-- Practical storage will be higher after metadata, indexes, receipts, media pointers, and replication.
+- Practical storage will be higher after metadata, indexes, receipts, media pointers, and replication
 
 ### Connection Estimate
 
 - If 10% of DAU are online simultaneously:
-- Concurrent online users = `50M × 10%` = **5 million concurrent connections**
+  - Concurrent online users = `50M × 10%` = **5 million concurrent connections**
 - Peak can be significantly higher during regional traffic spikes
 
 ### Bottlenecks to Expect
@@ -178,14 +178,14 @@ flowchart LR
 3. `User Mapping Service` returns: `user2 -> server-2`.
 4. `Chat Server-1` forwards the message to `Chat Server-2` (directly or via message broker).
 5. `Chat Server-2` pushes the message to `User2` over existing WebSocket connection.
-6. Delivery/read ACK follows reverse path and updates message status.
+6. Delivery/read ACK follows the reverse path and updates message status.
 
 #### User Mapping Service Responsibilities
 
-- Maintain `userId -> serverId` mapping for currently connected users.
-- Update mapping on connect, reconnect, heartbeat timeout, and disconnect.
-- Provide fast lookup for message routing.
-- Optionally store additional metadata: device id, last seen, and connection timestamp.
+- Maintain `userId -> serverId` mapping for currently connected users
+- Update mapping on connect, reconnect, heartbeat timeout, and disconnect
+- Provide fast lookup for message routing
+- Optionally store additional metadata: device id, last seen, and connection timestamp
 
 ### Data Model Ideas
 
@@ -214,9 +214,9 @@ Polling uses short-lived request/response cycles. The client connects, sends/get
 
 #### Flow
 
-- Client connects to server and sends message request.
-- Server responds quickly, then connection closes.
-- Client reconnects again and sends next message request.
+- Client connects to server and sends message request
+- Server responds quickly, then connection closes
+- Client reconnects again and sends next message request
 
 ```mermaid
 sequenceDiagram
@@ -238,10 +238,10 @@ Long polling keeps a request open for longer time. The server responds when new 
 
 #### Flow
 
-- Client connects and sends message/receive request.
-- Server holds connection and waits for new event for a longer duration.
-- Server responds (message/timeout), connection closes.
-- Client reconnects and sends next long-poll request.
+- Client connects and sends message/receive request
+- Server holds connection and waits for new event for a longer duration
+- Server responds (message/timeout), connection closes
+- Client reconnects and sends next long-poll request
 
 ```mermaid
 sequenceDiagram
@@ -265,11 +265,11 @@ WebSocket keeps a persistent connection between client and server. After handsha
 
 #### Flow
 
-- Client connects to server using WebSocket handshake.
-- Server sends ACK and connection is established.
-- Bi-directional messaging happens on the same persistent connection.
-- No reconnect is needed for each message while connection is healthy.
-- If either entity closes the connection, the session is closed.
+- Client connects to server using WebSocket handshake
+- Server sends ACK and connection is established
+- Bi-directional messaging happens on the same persistent connection
+- No reconnect is needed for each message while connection is healthy
+- If either entity closes the connection, the session is closed
 
 ```mermaid
 sequenceDiagram
@@ -387,6 +387,7 @@ sequenceDiagram
 - Use **event streaming** for asynchronous fanout and notification workflows
 
 ---
+
 
 ## Summary
 
