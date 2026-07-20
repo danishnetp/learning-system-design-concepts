@@ -192,6 +192,39 @@ flowchart LR
 **Pros**: simple to implement
 **Cons**: boundary burst problem — 2x traffic can pass at window edge
 
+#### Implementation
+
+```java
+class FixedWindowRateLimiter {
+    private final int limit;
+    private final long windowSizeMs;
+    private int count = 0;
+    private long windowStart = System.currentTimeMillis();
+
+    public synchronized boolean allowRequest() {
+        long now = System.currentTimeMillis();
+        if (now - windowStart >= windowSizeMs) {
+            // new window — reset counter
+            count = 0;
+            windowStart = now;
+        }
+        if (count < limit) {
+            count++;
+            return true;   // allowed
+        }
+        return false;      // rejected 429
+    }
+}
+```
+
+> **Redis version:**
+> ```text
+> key   = rate_limit:{userId}:{windowTimestamp}
+> count = INCR key
+> if count == 1: EXPIRE key windowSizeSeconds
+> if count > limit: reject 429
+> ```
+
 ### 4.4 Sliding Window Log
 
 - Stores timestamp of every request in a log
@@ -215,6 +248,44 @@ flowchart TD
 
 **Pros**: accurate, no boundary burst
 **Cons**: high memory usage for storing all timestamps
+
+#### Implementation
+
+```java
+class SlidingWindowLogRateLimiter {
+    private final int limit;
+    private final long windowSizeMs;
+    private final Deque<Long> log = new ArrayDeque<>();
+
+    public synchronized boolean allowRequest() {
+        long now = System.currentTimeMillis();
+        long windowStart = now - windowSizeMs;
+
+        // remove timestamps outside the window
+        while (!log.isEmpty() && log.peekFirst() <= windowStart) {
+            log.pollFirst();
+        }
+
+        if (log.size() < limit) {
+            log.addLast(now);
+            return true;   // allowed
+        }
+        return false;      // rejected 429
+    }
+}
+```
+
+> **Redis version:**
+> ```text
+> key = rate_limit_log:{userId}
+> ZREMRANGEBYSCORE key 0 (now - windowMs)
+> count = ZCARD key
+> if count < limit:
+>     ZADD key now now
+>     EXPIRE key windowSeconds
+>     allow
+> else: reject 429
+> ```
 
 ### 4.5 Sliding Window Counter
 
@@ -244,6 +315,57 @@ flowchart LR
 
 **Pros**: memory efficient, more accurate than fixed window
 **Cons**: approximate, not perfectly accurate
+
+#### Implementation
+
+```java
+class SlidingWindowCounterRateLimiter {
+    private final int limit;
+    private final long windowSizeMs;
+    private int prevCount = 0;
+    private int currCount = 0;
+    private long windowStart = System.currentTimeMillis();
+
+    public synchronized boolean allowRequest() {
+        long now = System.currentTimeMillis();
+        long elapsed = now - windowStart;
+
+        if (elapsed >= windowSizeMs * 2) {
+            // both windows are stale — full reset
+            prevCount = 0;
+            currCount = 0;
+            windowStart = now;
+        } else if (elapsed >= windowSizeMs) {
+            // slide: current becomes previous, start fresh current
+            prevCount = currCount;
+            currCount = 0;
+            windowStart += windowSizeMs;
+        }
+
+        // weighted rate using fraction of current window elapsed
+        double fraction = (double)(now - windowStart) / windowSizeMs;
+        double estimatedCount = prevCount * (1 - fraction) + currCount;
+
+        if (estimatedCount < limit) {
+            currCount++;
+            return true;   // allowed
+        }
+        return false;      // rejected 429
+    }
+}
+```
+
+> **Redis version:**
+> ```text
+> prevKey = rate_limit:{userId}:{prevWindowTs}
+> currKey = rate_limit:{userId}:{currWindowTs}
+> prevCount = GET prevKey  (default 0)
+> currCount = INCR currKey
+> if currCount == 1: EXPIRE currKey windowSeconds * 2
+> fraction  = elapsed_ms / windowMs
+> estimated = prevCount * (1 - fraction) + currCount
+> if estimated > limit: reject 429
+> ```
 
 ### Algorithm Comparison
 
