@@ -134,6 +134,59 @@ flowchart LR
 5. Online recipients receive the message instantly through WebSocket.
 6. Offline recipients get push notifications and later sync the missed messages.
 
+### 1:1 Message Sending Flow (Multi-Server)
+
+In a scaled chat system, `Client1..ClientN` are connected to multiple chat gateway servers. A dedicated `User Mapping Service` keeps the active mapping of each user to the server currently handling that user connection.
+
+```mermaid
+flowchart LR
+    subgraph Clients
+        C1[Client1 / User1]
+        C2[Client2 / User2]
+        CN[ClientN / UserN]
+    end
+
+    subgraph Gateways[WebSocket Chat Gateway Servers]
+        S1[Chat Server-1]
+        S2[Chat Server-2]
+        S3[Chat Server-3]
+    end
+
+    UMS[User Mapping Service\nuserId -> serverId]
+    MQ[Message Broker]
+
+    C1 <--> S1
+    C2 <--> S2
+    CN <--> S3
+
+    S1 <--> UMS
+    S2 <--> UMS
+    S3 <--> UMS
+
+    S1 --> MQ
+    MQ --> S2
+    MQ --> S3
+
+    UMS --- M1[(user1 -> server-1)]
+    UMS --- M2[(user2 -> server-2)]
+```
+
+#### Routing Steps (User1 sends message to User2)
+
+1. `User1` is connected to `Chat Server-1` and sends a 1:1 message.
+2. `Chat Server-1` persists the message and queries `User Mapping Service` for `User2` location.
+3. `User Mapping Service` returns: `user2 -> server-2`.
+4. `Chat Server-1` forwards the message to `Chat Server-2` (directly or via message broker).
+5. `Chat Server-2` pushes the message to `User2` over existing WebSocket connection.
+6. Delivery/read ACK follows reverse path and updates message status.
+
+#### User Mapping Service Responsibilities
+
+- Maintain `userId -> serverId` mapping for currently connected users.
+- Update mapping on connect, reconnect, heartbeat timeout, and disconnect.
+- Provide fast lookup for message routing.
+- Optionally store additional metadata: device id, last seen, and connection timestamp.
+
 ### Data Model Ideas
 
 - **User**: user profile and device tokens
