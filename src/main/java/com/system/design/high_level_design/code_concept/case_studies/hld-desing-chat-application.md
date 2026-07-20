@@ -75,30 +75,30 @@ flowchart LR
 
 ### Example Assumptions
 
-- 1 million daily active users
-- 20 messages per user per day on average
-- 5 million total chats / conversations
-- Peak traffic is 5x the average traffic
-- Average message payload: 1 KB text + metadata
+- Total users: **2 billion**
+- Daily active users (DAU): **50 million**
+- Per active user:
+  - 10 messages to 4 people
+  - Total = **40 messages/day/user**
+- Message body size assumption: **100 characters ~= 100 bytes**
 
 ### Message Volume
 
-- Daily messages = 1M × 20 = **20 million messages/day**
-- Average message rate = 20M / 86,400 ≈ **231 messages/sec**
-- Peak message rate (5x) ≈ **1,155 messages/sec**
+- Daily messages = `50M × 40` = **2,000M = 2 billion messages/day**
+- Average message rate = `2,000,000,000 / 86,400` ≈ **23,148 messages/sec**
 
 ### Storage Estimate
 
-- If one message record is ~1 KB
-- Daily storage = 20M × 1 KB ≈ **20 GB/day**
-- Yearly storage = 20 GB × 365 ≈ **7.3 TB/year**
-- With indexing, receipts, and metadata, plan for **10+ TB/year**
+- Per-message payload = **100 bytes**
+- Daily payload storage = `2,000,000,000 × 100 bytes` = **200,000,000,000 bytes ~= 200 GB/day**
+- 10-year payload storage = `200 GB × 365 × 10` = **730,000 GB ~= 730 TB (~0.73 PB)**
+- Practical storage will be higher after metadata, indexes, receipts, media pointers, and replication.
 
 ### Connection Estimate
 
-- If 10% of users are online simultaneously
-- Concurrent online users = 1M × 10% = **100,000 connections**
-- Peak concurrent connections may be much higher for a global app
+- If 10% of DAU are online simultaneously:
+- Concurrent online users = `50M × 10%` = **5 million concurrent connections**
+- Peak can be significantly higher during regional traffic spikes
 
 ### Bottlenecks to Expect
 
