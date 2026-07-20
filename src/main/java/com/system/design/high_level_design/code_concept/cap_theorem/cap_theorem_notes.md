@@ -18,7 +18,7 @@ flowchart LR
 
     App --> DB1
     App --> DB2
-    DB1 <--> DB2
+    DB1 <--> |replication| DB2
 ```
 
 ## Meaning 
