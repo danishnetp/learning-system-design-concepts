@@ -206,7 +206,48 @@ sequenceDiagram
     Note over C,S: Connection closed (disconnect)
 ```
 
-### 4.3 Trade-offs: Polling vs Long Polling
+### 4.3 WebSocket Protocol
+
+WebSocket keeps a persistent connection between client and server. After handshake and ACK, both sides can send messages anytime (bi-directional) without reconnecting for each message.
+
+#### Flow
+
+- Client connects to server using WebSocket handshake.
+- Server sends ACK and connection is established.
+- Bi-directional messaging happens on the same persistent connection.
+- No reconnect is needed for each message while connection is healthy.
+- If either entity closes the connection, the session is closed.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+
+    C->>S: WebSocket Connect (Handshake)
+    S-->>C: ACK / Connection Established
+
+    Note over C,S: Persistent connection (single long-lived socket)
+
+    C->>S: Message 1
+    S-->>C: ACK Message 1
+    S->>C: Message 2 (server push)
+    C-->>S: ACK Message 2
+
+    C->>S: Message 3
+    S->>C: Message 4
+
+    Note over C,S: Bi-directional communication, no reconnect per message
+
+    alt Client closes
+        C-xS: Close frame
+        Note over C,S: Connection closed
+    else Server closes
+        S-xC: Close frame
+        Note over C,S: Connection closed
+    end
+```
+
+### 4.4 Trade-offs: Polling vs Long Polling
 
 #### Polling Trade-offs
 
