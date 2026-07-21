@@ -184,3 +184,89 @@ Use a simple formula for rough storage estimation:
 - Add extra capacity for replication, backups, and future growth.
 - For images and videos, use object storage instead of storing large files directly in the database.
 
+## Estimation of Facebook
+
+### 1) Traffic Estimation
+
+- **Total users**: 1 billion (1,000,000,000)
+- **Daily active users (DAU)**: 25% of total users = 250 million
+
+If each daily active user performs:
+- **Read operations**: 5
+- **Write operations**: 2
+- **Total operations per user per day**: 7
+
+Then:
+
+- **Total daily queries** = 250,000,000 x 7 = 1,750,000,000 queries/day
+- **Seconds per day** = 60 x 60 x 24 = 86,400
+- **Queries per second (QPS)** = 1,750,000,000 / 86,400 approx. 20,255 QPS
+
+Rounded estimate: **~20K QPS**
+
+### 2) Quick Summary Table
+
+| Metric                 | Value             |
+|------------------------|-------------------|
+| Total users            | 1 billion         |
+| Daily active users     | 250 million (25%) |
+| Read ops per user/day  | 5                 |
+| Write ops per user/day | 2                 |
+| Total ops per user/day | 7                 |
+| Total daily queries    | 1.75 billion      |
+| Estimated QPS          | ~20K              |
+
+### 3) Storage Estimation
+
+Assumptions:
+
+- Each active user creates **2 posts/day**.
+- Each post has **250 characters**.
+- Assume **2 bytes per character**.
+- **10% of users** upload **1 image/day**.
+- Average image size = **300 KB**.
+
+Text storage calculation:
+
+- Per post = 250 characters x 2 bytes = 500 bytes
+- Per user per day (2 posts) = 500 x 2 = 1,000 bytes (~1 KB)
+- Total text storage/day = 250 million (6 zero) users x 1 KB (3 zero)
+- Total text storage/day = 250 million KB = 250 GB (9 zero)
+
+Image storage calculation:
+
+- Users uploading images/day = 10% of 250 million = 25 million users
+- Total image storage/day = 25 million x 300 KB
+- Total image storage/day = 7,500,000,000 KB = 7.5 TB
+
+Estimated daily storage summary:
+
+| Data Type       | Daily Estimate  |
+|-----------------|-----------------|
+| Text posts      | 250 GB (9 zero) |
+| Images          | 7.5 TB          |
+| Total (approx.) | 7.75 TB/day     |
+
+### 4) Five-Year Storage Estimation
+
+To estimate long-term storage, use a rounded time window for easy planning:
+
+- 5 years = 5 x 365 = 1,825 days
+- Approximate for rough estimation = **2,000 days**
+
+Calculations:
+
+- Post storage for 5 years = 250 GB/day x 2,000 days = 500,000 GB = 500 TB
+- Image storage for 5 years = 7.5 TB/day x 2,000 days = 15,000 TB = 15 PB
+
+| Data Type  | Daily Storage | 5-Year Storage (Approx.) |
+|------------|---------------|--------------------------|
+| Text posts | 250 GB/day    | 500 TB                   |
+| Images     | 7.5 TB/day    | 15 PB                    |
+| Total      | 7.75 TB/day   | ~15.5 PB                 |
+
+Notes:
+
+- This is a rough estimate and does not include replication, backups, or compression.
+- Real-world systems should add extra capacity for growth, metadata, and indexes.
+
