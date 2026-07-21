@@ -151,6 +151,8 @@ If the active data center fails, traffic shifts to the passive data center.
 
 Both data centers are active and serve traffic at the same time. This provides high availability and better utilization.
 
+**Note**: Cassandra can be used for multi-master replication, or other databases that support active-active replication can be used.
+
 ```mermaid
 flowchart LR
 	C[Client] --> GSLB[Global Load Balancer]
