@@ -70,8 +70,12 @@ The term **"nines"** refers to the number of 9s in the availability percentage. 
 ```mermaid
 flowchart LR
     C[Client] --> LB[Load Balancer]
-    LB --> A1[App Server 1]
-    LB --> A2[App Server 2]
+    subgraph S[Server]
+        A1[App1]
+        A2[App2]
+    end
+    LB --> A1
+    LB --> A2
     A1 --> DB[(Primary DB)]
     A2 --> DB
 ```
