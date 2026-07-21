@@ -109,37 +109,39 @@ If the active node fails, traffic shifts to the passive node.
 
 **Disadvantages**: Passive resources are underutilized.
 
-### 3) Multi-Node Active-Active
+### 3) One Server with Two Nodes
 
 ```mermaid
 flowchart LR
-    C[Client] --> LB1[Load Balancer 1]
-    C --> LB2[Load Balancer 2]
+    C[Client] --> LB[Load Balancer]
 
     subgraph Server
-        A1[App1]
-        A2[App2]
-        A3[App3]
+        subgraph Node1
+            A11[App1]
+            A12[App2]
+            DB1[(DB - Primary)]
+            A11 --> DB1
+            A12 --> DB1
+        end
+        subgraph Node2
+            A21[App1]
+            A22[App2]
+            DB2[(DB - Replica)]
+            A21 --> DB2
+            A22 --> DB2
+        end
     end
 
-    LB1 --> A1
-    LB1 --> A2
-    LB2 --> A2
-    LB2 --> A3
-
-    A1 --> DBP[(Primary DB)]
-    A2 --> DBP
-    A3 --> DBP
-
-    DBP --> DBR1[(Read Replica 1)]
-    DBP --> DBR2[(Read Replica 2)]
+    LB --> Node1
+    LB --> Node2
+    DB1 -->|Replication| DB2
 ```
 
-All active nodes serve traffic simultaneously; failure of one node does not stop service.
+One server contains two nodes. Each node has multiple apps and one database.
 
-**Advantages**: High availability, better resource utilization, horizontal scalability.
+**Advantages**: Better redundancy inside a single server boundary, simple logical separation by node.
 
-**Disadvantages**: More operational complexity and coordination overhead.
+**Disadvantages**: Still a single-server risk; if the server fails, both nodes are affected.
 
 ### 4) One Load Balancer with Two Data Centers (DR Setup)
 
