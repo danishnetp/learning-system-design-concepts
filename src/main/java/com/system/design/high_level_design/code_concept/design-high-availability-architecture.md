@@ -116,10 +116,16 @@ flowchart LR
     C[Client] --> LB1[Load Balancer 1]
     C --> LB2[Load Balancer 2]
 
-    LB1 --> A1[App Node 1]
-    LB1 --> A2[App Node 2]
+    subgraph Server
+        A1[App1]
+        A2[App2]
+        A3[App3]
+    end
+
+    LB1 --> A1
+    LB1 --> A2
     LB2 --> A2
-    LB2 --> A3[App Node 3]
+    LB2 --> A3
 
     A1 --> DBP[(Primary DB)]
     A2 --> DBP
