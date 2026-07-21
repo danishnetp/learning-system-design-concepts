@@ -47,20 +47,6 @@ NoSQL databases provide flexible schema design and are designed for distributed 
 - **Column-family stores** (e.g., Cassandra, HBase): Store data in columns rather than rows, which can be more efficient for certain types of queries and analytics.
 - **Graph databases** (e.g., Neo4j, ArangoDB): Store data as nodes and edges, allowing for efficient representation and querying of complex relationships.
 
-## SQL vs NoSQL Comparison Table
-
-| Feature            | SQL                                                 | NoSQL                                                   |
-|--------------------|-----------------------------------------------------|---------------------------------------------------------|
-| **Data Model**     | Relational (Tables with rows and columns)           | Flexible (Documents, Key-value, Columns, Graphs)        |
-| **Schema**         | Fixed schema (predefined structure)                 | Flexible schema (dynamic structure)                     |
-| **Scalability**    | Vertical scaling (add more resources to one server) | Horizontal scaling (distribute across multiple servers) |
-| **Consistency**    | Strong ACID compliance                              | Eventual consistency (BASE model)                       |
-| **Query Language** | SQL                                                 | Database-specific APIs/languages                        |
-| **Transactions**   | Strong transaction support                          | Limited transaction support (varies by type)            |
-| **Relationships**  | Built-in support for complex relationships          | Denormalized data (relationships in documents)          |
-| **Performance**    | Good for complex queries                            | Good for simple, fast lookups                           |
-| **Data Integrity** | Strict constraints and validations                  | More lenient on data validation                         |
-| **Best For**       | Complex queries, financial systems, relational data | High volume, distributed, flexible data                 |
 
 ## NoSQL Types Comparison & When to Use
 
