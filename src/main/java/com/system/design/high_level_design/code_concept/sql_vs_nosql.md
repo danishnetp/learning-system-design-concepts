@@ -7,6 +7,21 @@
 - **Scalability**: The ability to handle more data or users.
 - **Property**: ACID stands for Atomicity, Consistency, Isolation, and Durability.
 
+## SQL vs NoSQL Comparison Table
+
+| Feature            | SQL                                                 | NoSQL                                                   |
+|--------------------|-----------------------------------------------------|---------------------------------------------------------|
+| **Data Model**     | Relational (Tables with rows and columns)           | Flexible (Documents, Key-value, Columns, Graphs)        |
+| **Schema**         | Fixed schema (predefined structure)                 | Flexible schema (dynamic structure)                     |
+| **Scalability**    | Vertical scaling (add more resources to one server) | Horizontal scaling (distribute across multiple servers) |
+| **Consistency**    | Strong ACID compliance                              | Eventual consistency (BASE model)                       |
+| **Query Language** | SQL                                                 | Database-specific APIs/languages                        |
+| **Transactions**   | Strong transaction support                          | Limited transaction support (varies by type)            |
+| **Relationships**  | Built-in support for complex relationships          | Denormalized data (relationships in documents)          |
+| **Performance**    | Good for complex queries                            | Good for simple, fast lookups                           |
+| **Data Integrity** | Strict constraints and validations                  | More lenient on data validation                         |
+| **Best For**       | Complex queries, financial systems, relational data | High volume, distributed, flexible data                 |
+
 ## SQL
 
 SQL is used to query relational databases. It is a structured query language used to manage and manipulate relational data. SQL databases use a fixed schema and store data in tables.
@@ -31,6 +46,31 @@ NoSQL databases provide flexible schema design and are designed for distributed 
 - **Key-value stores** (e.g., Redis, DynamoDB): Store data as key-value pairs, allowing for fast lookups and simple data structures.
 - **Column-family stores** (e.g., Cassandra, HBase): Store data in columns rather than rows, which can be more efficient for certain types of queries and analytics.
 - **Graph databases** (e.g., Neo4j, ArangoDB): Store data as nodes and edges, allowing for efficient representation and querying of complex relationships.
+
+## SQL vs NoSQL Comparison Table
+
+| Feature            | SQL                                                 | NoSQL                                                   |
+|--------------------|-----------------------------------------------------|---------------------------------------------------------|
+| **Data Model**     | Relational (Tables with rows and columns)           | Flexible (Documents, Key-value, Columns, Graphs)        |
+| **Schema**         | Fixed schema (predefined structure)                 | Flexible schema (dynamic structure)                     |
+| **Scalability**    | Vertical scaling (add more resources to one server) | Horizontal scaling (distribute across multiple servers) |
+| **Consistency**    | Strong ACID compliance                              | Eventual consistency (BASE model)                       |
+| **Query Language** | SQL                                                 | Database-specific APIs/languages                        |
+| **Transactions**   | Strong transaction support                          | Limited transaction support (varies by type)            |
+| **Relationships**  | Built-in support for complex relationships          | Denormalized data (relationships in documents)          |
+| **Performance**    | Good for complex queries                            | Good for simple, fast lookups                           |
+| **Data Integrity** | Strict constraints and validations                  | More lenient on data validation                         |
+| **Best For**       | Complex queries, financial systems, relational data | High volume, distributed, flexible data                 |
+
+## NoSQL Types Comparison & When to Use
+
+| NoSQL Type        | Examples                        | When to Use                                   | Best For                                           | Advantages                                           | Disadvantages                                                |
+|-------------------|---------------------------------|-----------------------------------------------|----------------------------------------------------|------------------------------------------------------|--------------------------------------------------------------|
+| **Key-value**     | Redis, DynamoDB, Memcached      | Need fast lookups and caching                 | Real-time applications, caching, sessions          | Ultra-fast, simple, horizontal scaling               | No complex queries, limited data types                       |
+| **Document**      | MongoDB, CouchDB, Firebase      | Flexible schema, document-oriented data       | CMS, e-commerce, mobile apps, user profiles        | Flexible schema, schema evolution, JSON-like storage | Larger disk space, slower for complex joins                  |
+| **Column-family** | Cassandra, HBase, HyperTable    | Time-series data, analytics, massive datasets | Data analytics, time-series data, IoT              | Excellent compression, efficient for analytics       | Complex queries difficult, high write latency learning curve |
+| **Graph**         | Neo4j, ArangoDB, Amazon Neptune | Complex relationships and connections         | Social networks, recommendations, knowledge graphs | Efficient relationship queries, real-time insights   | Not suitable for simple queries, memory-intensive            |
+| **Search**        | Elasticsearch, Solr             | Full-text search and log analysis             | Search engines, log aggregation, metrics           | Fast search, real-time indexing                      | Not for traditional transactional data                       |
 
 ## Comparison: NoSQL Types vs SQL
 
