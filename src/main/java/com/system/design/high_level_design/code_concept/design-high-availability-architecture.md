@@ -70,7 +70,7 @@ The term **"nines"** refers to the number of 9s in the availability percentage. 
 ```mermaid
 flowchart LR
     C[Client] --> LB[Load Balancer]
-    subgraph S[Server]
+    subgraph Server
         A1[App1]
         A2[App2]
     end
@@ -91,16 +91,16 @@ If the primary database fails, the system becomes unavailable.
 ```mermaid
 flowchart LR
     C[Client] --> LB[Load Balancer]
-    subgraph S[Server]
-        A1[App1 (Active)]
-        A2[App2 (Passive)]
+    subgraph Server
+        A1[App1 - Active]
+        A2[App2 - Passive]
     end
     LB --> A1
-    LB -. failover .-> A2
+    LB -->|Failover| A2
 
     A1 --> DB1[(Primary DB)]
-    A2 -. standby .-> DB2[(Replica DB)]
-    DB1 --> DB2
+    A2 -->|Standby| DB2[(Replica DB)]
+    DB1 -->|Replication| DB2
 ```
 
 If the active node fails, traffic shifts to the passive node.
