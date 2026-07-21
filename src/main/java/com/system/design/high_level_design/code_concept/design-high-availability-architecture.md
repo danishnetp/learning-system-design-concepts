@@ -181,3 +181,33 @@ Notes:
 - DC-2 is used for disaster recovery.
 - DC-2 database stays synchronized with DC-1 database.
 
+### 5) One Load Balancer with One Data Center
+
+```mermaid
+flowchart LR
+    C[Client] --> LB[Load Balancer]
+
+    subgraph DC1[Data Center 1]
+        S1[Server]
+        A11[App1]
+        A12[App2]
+        DB1[(DB - Primary)]
+        DB2[(DB - Replica)]
+
+        S1 --> A11
+        S1 --> A12
+        A11 --> DB1
+        A12 --> DB1
+        DB1 -->|Replication| DB2
+    end
+
+    LB --> S1
+```
+
+Notes:
+
+- One load balancer routes traffic to a single data center.
+- The data center has one server running multiple apps.
+- The primary database replicates to a standby replica inside the same data center.
+- This improves local availability but does not protect against full data-center outages.
+
