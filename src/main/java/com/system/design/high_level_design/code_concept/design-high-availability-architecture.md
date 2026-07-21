@@ -141,3 +141,43 @@ All active nodes serve traffic simultaneously; failure of one node does not stop
 
 **Disadvantages**: More operational complexity and coordination overhead.
 
+### 4) One Load Balancer with Two Data Centers (DR Setup)
+
+```mermaid
+flowchart LR
+    C[Client] --> LB[Load Balancer]
+
+    subgraph DC1[Data Center 1 - Primary]
+        S1[Server]
+        A11[App1]
+        A12[App2]
+        DB1[(DB - Primary)]
+        S1 --> A11
+        S1 --> A12
+        A11 --> DB1
+        A12 --> DB1
+    end
+
+    subgraph DC2[Data Center 2 - Disaster Recovery]
+        S2[Server]
+        A21[App1]
+        A22[App2]
+        DB2[(DB - DR Replica)]
+        S2 --> A21
+        S2 --> A22
+        A21 --> DB2
+        A22 --> DB2
+    end
+
+    LB --> S1
+    LB -->|Failover Traffic| S2
+    DB1 -->|Sync / Replication| DB2
+```
+
+Notes:
+
+- One load balancer routes traffic to two data centers.
+- Each data center has one server running multiple apps and one database.
+- DC-2 is used for disaster recovery.
+- DC-2 database stays synchronized with DC-1 database.
+
