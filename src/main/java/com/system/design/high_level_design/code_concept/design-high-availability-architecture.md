@@ -91,8 +91,12 @@ If the primary database fails, the system becomes unavailable.
 ```mermaid
 flowchart LR
     C[Client] --> LB[Load Balancer]
-    LB --> A1[Active App Node]
-    LB -. failover .-> A2[Passive App Node]
+    subgraph S[Server]
+        A1[App1 (Active)]
+        A2[App2 (Passive)]
+    end
+    LB --> A1
+    LB -. failover .-> A2
 
     A1 --> DB1[(Primary DB)]
     A2 -. standby .-> DB2[(Replica DB)]
