@@ -270,3 +270,93 @@ Notes:
 - This is a rough estimate and does not include replication, backups, or compression.
 - Real-world systems should add extra capacity for growth, metadata, and indexes.
 
+### 5) RAM Estimation
+
+Assumptions for rough RAM sizing:
+
+- QPS is ~20K (from traffic estimation).
+- We keep only hot data in memory (not full historical storage).
+- Images are served via object storage/CDN, so image binaries are not fully cached in DB RAM.
+
+Approximate RAM breakdown:
+
+| Component                | Assumption                                | Estimated RAM |
+|--------------------------|-------------------------------------------|---------------|
+| Hot post cache           | 20% of daily text data (20% of 250 GB)    | ~50 GB        |
+| Session/cache metadata   | 5 million concurrent users x 5 KB/session | ~25 GB        |
+| Query/index working set  | DB and app working set                    | ~40 GB        |
+| Buffer and safety margin | GC, fragmentation, spikes                 | ~35 GB        |
+| **Total (rounded)**      |                                           | **~150 GB**   |
+
+Recommended practical allocation: **~256 GB RAM** across a cache cluster (for redundancy and headroom).
+
+### 6) Bandwidth Estimation
+
+From traffic estimation:
+
+- Total QPS ~20,255 (rounded to 20K).
+- Read:Write ratio = 5:2.
+- Read QPS ~14,468 and Write QPS ~5,787.
+
+Assume average payload sizes:
+
+- Read response size = 50 KB
+- Write request size = 2 KB
+
+Bandwidth calculation:
+
+- Read bandwidth = 14,468 x 50 KB/s = 723,400 KB/s ~706 MB/s ~5.6 Gbps
+- Write bandwidth = 5,787 x 2 KB/s = 11,574 KB/s ~11.3 MB/s ~0.09 Gbps
+- Total API bandwidth ~5.7 Gbps (average)
+
+Image traffic (from storage assumptions):
+
+- 7.5 TB/day images ~86.8 MB/s ~0.69 Gbps average
+
+Recommended planning target with peak multiplier (3x):
+
+- **Application/API layer**: ~17-18 Gbps peak
+- **Image/CDN layer**: ~2.1 Gbps peak
+
+### 7) Server Estimation
+
+Assume one medium app server handles ~1,000 QPS safely.
+
+- Required app servers = 20,000 / 1,000 = 20 servers
+- Add 30% headroom for peak and failures: 20 x 1.3 = 26
+- Rounded practical target: **30 app servers**
+
+Suggested high-level server split:
+
+| Layer         | Suggested Count               | Notes                              |
+|---------------|-------------------------------|------------------------------------|
+| Load balancer | 2 (active-active)             | High availability                  |
+| App servers   | ~30                           | Handles ~20K QPS + headroom        |
+| Cache nodes   | 4-6                           | Distributed cache with replication |
+| Database      | 1 primary + 3-5 read replicas | Read scaling and failover          |
+
+This is a rough estimate and should be validated with load testing.
+
+### 8) CAP Trade-off Consideration
+
+For a Facebook-like social system, CAP decisions are usually mixed by feature:
+
+- **Feed and timeline**: Prefer **Availability + Partition Tolerance (AP)** with eventual consistency.
+- **Likes/comments counters**: Usually AP with asynchronous reconciliation.
+- **User profile updates**: Lean toward stronger consistency where user-visible correctness matters.
+- **Authentication, billing, or payment-related data**: Prefer **Consistency + Partition Tolerance (CP)**.
+
+In practice, social platforms typically favor **AP for high-scale user interactions** and **CP for critical data paths**.
+
+### Conclusion
+
+Based on the above back-of-the-envelope estimation for a Facebook-like workload:
+
+- Estimated traffic: **~20K QPS**
+- Daily storage growth: **~7.75 TB/day**
+- Five-year storage (rough): **~15.5 PB**
+- Suggested RAM footprint: **~150 GB minimum**, plan around **~256 GB cluster RAM**
+- Suggested app tier size: **~30 servers** for headroom and fault tolerance
+
+Final note: this is a directional estimate. Real production sizing should include benchmarks, regional traffic distribution, replication factor, disaster recovery, and growth forecasts.
+
