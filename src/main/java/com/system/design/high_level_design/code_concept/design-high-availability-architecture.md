@@ -63,3 +63,67 @@ The term **"nines"** refers to the number of 9s in the availability percentage. 
 | Cache layer   | Redis instance down | Clustered cache with replication            |
 | DNS           | DNS server outage   | Multiple DNS providers                      |
 
+## High Availability Design Diagrams
+
+### 1) Single-Node Style (Has SPOF)
+
+```mermaid
+flowchart LR
+    C[Client] --> LB[Load Balancer]
+    LB --> A1[App Server 1]
+    LB --> A2[App Server 2]
+    A1 --> DB[(Primary DB)]
+    A2 --> DB
+```
+
+If the primary database fails, the system becomes unavailable.
+
+**Advantages**: Simple architecture, easy to implement.
+
+**Disadvantages**: Single point of failure, downtime during maintenance.
+
+### 2) Two-Node Active-Passive
+
+```mermaid
+flowchart LR
+    C[Client] --> LB[Load Balancer]
+    LB --> A1[Active App Node]
+    LB -. failover .-> A2[Passive App Node]
+
+    A1 --> DB1[(Primary DB)]
+    A2 -. standby .-> DB2[(Replica DB)]
+    DB1 --> DB2
+```
+
+If the active node fails, traffic shifts to the passive node.
+
+**Advantages**: Better availability than single-node setup, controlled failover.
+
+**Disadvantages**: Passive resources are underutilized.
+
+### 3) Multi-Node Active-Active
+
+```mermaid
+flowchart LR
+    C[Client] --> LB1[Load Balancer 1]
+    C --> LB2[Load Balancer 2]
+
+    LB1 --> A1[App Node 1]
+    LB1 --> A2[App Node 2]
+    LB2 --> A2
+    LB2 --> A3[App Node 3]
+
+    A1 --> DBP[(Primary DB)]
+    A2 --> DBP
+    A3 --> DBP
+
+    DBP --> DBR1[(Read Replica 1)]
+    DBP --> DBR2[(Read Replica 2)]
+```
+
+All active nodes serve traffic simultaneously; failure of one node does not stop service.
+
+**Advantages**: High availability, better resource utilization, horizontal scalability.
+
+**Disadvantages**: More operational complexity and coordination overhead.
+
