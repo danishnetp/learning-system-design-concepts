@@ -67,149 +67,131 @@ The term **"nines"** refers to the number of 9s in the availability percentage. 
 
 ### 1) Single-Node Style (Has SPOF)
 
-```mermaid
-flowchart LR
-    C[Client] --> LB[Load Balancer]
-    subgraph Server
-        A1[App1]
-        A2[App2]
-    end
-    LB --> A1
-    LB --> A2
-    A1 --> DB[(Primary DB)]
-    A2 --> DB
-```
-
-If the primary database fails, the system becomes unavailable.
-
-**Advantages**: Simple architecture, easy to implement.
-
-**Disadvantages**: Single point of failure, downtime during maintenance.
-
-### 2) Two-Node Active-Passive
+In this approach, the application and database run in a single data center path. It is easy to build but risky for production.
 
 ```mermaid
 flowchart LR
-    C[Client] --> LB[Load Balancer]
-    subgraph Server
-        A1[App1 - Active]
-        A2[App2 - Passive]
-    end
-    LB --> A1
-    LB -->|Failover| A2
-
-    A1 --> DB1[(Primary DB)]
-    A2 -->|Standby| DB2[(Replica DB)]
-    DB1 -->|Replication| DB2
+	C[Client] --> LB[Load Balancer]
+	subgraph DC1[Data Center 1]
+		subgraph Server[Server]
+			A1[App1]
+			A2[App2]
+		end
+		DB1[(DB - Primary)]
+	end
+	LB --> A1
+	LB --> A2
+	A1 --> DB1
+	A2 --> DB1
 ```
 
-If the active node fails, traffic shifts to the passive node.
+If the primary database or data center fails, the system becomes unavailable.
 
-**Advantages**: Better availability than single-node setup, controlled failover.
+**When to use**: Dev/test environments, internal tools, low-critical workloads.
 
-**Disadvantages**: Passive resources are underutilized.
+**Advantages**:
+- Simple architecture and lower cost.
+- Easy deployment and debugging.
 
-### 3) One Server with Two Nodes
+**Disadvantages**:
+- Single point of failure (SPOF).
+- Planned maintenance can cause downtime.
+- No disaster recovery path.
+
+### 2) Active-Passive Architecture (Two Data Centers)
+
+Application servers and databases are deployed across two data centers. DC1 handles live traffic; DC2 remains standby for failover.
 
 ```mermaid
 flowchart LR
-    C[Client] --> LB[Load Balancer]
+	C[Client] --> LB[Load Balancer]
 
-    subgraph Server
-        subgraph Node1
-            A11[App1]
-            A12[App2]
-            DB1[(DB - Primary)]
-            A11 --> DB1
-            A12 --> DB1
-        end
-        subgraph Node2
-            A21[App1]
-            A22[App2]
-            DB2[(DB - Replica)]
-            A21 --> DB2
-            A22 --> DB2
-        end
-    end
+	subgraph DC1[Data Center 1 - Active]
+		subgraph S1[Server]
+			A11[App1]
+			A12[App2]
+		end
+		DB1[(DB - Primary)]
+		A11 --> DB1
+		A12 --> DB1
+	end
 
-    LB --> Node1
-    LB --> Node2
-    DB1 -->|Replication| DB2
+	subgraph DC2[Data Center 2 - Passive]
+		subgraph S2[Server]
+			A21[App1]
+			A22[App2]
+		end
+		DB2[(DB - Replica)]
+		A21 --> DB2
+		A22 --> DB2
+	end
+
+	LB --> DC1
+	LB -->|Failover| DC2
+	DB1 -->|Replication| DB2
 ```
 
-One server contains two nodes. Each node has multiple apps and one database.
+If the active data center fails, traffic shifts to the passive data center.
 
-**Advantages**: Better redundancy inside a single server boundary, simple logical separation by node.
+**Note**: Oracle, MySQL, and PostgreSQL typically support writes on the primary database and replication to the secondary database, either asynchronously or synchronously.
 
-**Disadvantages**: Still a single-server risk; if the server fails, both nodes are affected.
+**When to use**: Business-critical applications that need DR with simpler operations.
 
-### 4) One Load Balancer with Two Data Centers (DR Setup)
+**Advantages**:
+- Better availability than single-node setup.
+- Clear failover path and disaster recovery.
+- Easier consistency model than active-active.
+
+**Disadvantages**:
+- Passive resources are mostly idle.
+- Failover still has recovery time (RTO).
+- Cross-DC replication lag may affect RPO.
+
+### 3) Active-Active Architecture (Two Data Centers)
+
+Both data centers are active and serve traffic at the same time. This provides high availability and better utilization.
 
 ```mermaid
 flowchart LR
-    C[Client] --> LB[Load Balancer]
+	C[Client] --> GSLB[Global Load Balancer]
 
-    subgraph DC1[Data Center 1 - Primary]
-        S1[Server]
-        A11[App1]
-        A12[App2]
-        DB1[(DB - Primary)]
-        S1 --> A11
-        S1 --> A12
-        A11 --> DB1
-        A12 --> DB1
-    end
+	subgraph DC1[Data Center 1 - Active]
+		subgraph S1[Server]
+			A11[App1]
+			A12[App2]
+		end
+		DB1[(DB Cluster 1)]
+		A11 --> DB1
+		A12 --> DB1
+	end
 
-    subgraph DC2[Data Center 2 - Disaster Recovery]
-        S2[Server]
-        A21[App1]
-        A22[App2]
-        DB2[(DB - DR Replica)]
-        S2 --> A21
-        S2 --> A22
-        A21 --> DB2
-        A22 --> DB2
-    end
+	subgraph DC2[Data Center 2 - Active]
+		subgraph S2[Server]
+			A21[App1]
+			A22[App2]
+		end
+		DB2[(DB Cluster 2)]
+		A21 --> DB2
+		A22 --> DB2
+	end
 
-    LB --> S1
-    LB -->|Failover Traffic| S2
-    DB1 -->|Sync / Replication| DB2
+	GSLB --> DC1
+	GSLB --> DC2
+	DB1 <-->|Bi-directional Sync| DB2
 ```
 
-Notes:
+If one data center fails, the other keeps serving traffic.
 
-- One load balancer routes traffic to two data centers.
-- Each data center has one server running multiple apps and one database.
-- DC-2 is used for disaster recovery.
-- DC-2 database stays synchronized with DC-1 database.
+**When to use**: Global products requiring low latency and very high availability.
 
-### 5) One Load Balancer with One Data Center
+**Advantages**:
+- Highest availability and fault tolerance.
+- Better resource utilization (both DCs serve traffic).
+- Lower latency by routing users to nearest region.
 
-```mermaid
-flowchart LR
-    C[Client] --> LB[Load Balancer]
+**Disadvantages**:
+- Higher architectural and operational complexity.
+- Hard conflict resolution and data consistency handling.
+- Higher infrastructure and monitoring costs.
 
-    subgraph DC1[Data Center 1]
-        S1[Server]
-        A11[App1]
-        A12[App2]
-        DB1[(DB - Primary)]
-        DB2[(DB - Replica)]
-
-        S1 --> A11
-        S1 --> A12
-        A11 --> DB1
-        A12 --> DB1
-        DB1 -->|Replication| DB2
-    end
-
-    LB --> S1
-```
-
-Notes:
-
-- One load balancer routes traffic to a single data center.
-- The data center has one server running multiple apps.
-- The primary database replicates to a standby replica inside the same data center.
-- This improves local availability but does not protect against full data-center outages.
 
