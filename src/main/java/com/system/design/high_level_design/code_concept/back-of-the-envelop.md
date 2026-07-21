@@ -1,4 +1,4 @@
-## Back-of-the-Envelope Estimation
+# Back-of-the-Envelope Estimation
 
 What is back-of-the-envelope estimation?
 
@@ -112,10 +112,75 @@ Use this table to quickly map zeros to common large-number terms and storage uni
 | 12    | 1,000,000,000,000     | Trillion    | Very large-scale systems         | TB = 10^12 bytes  |
 | 15    | 1,000,000,000,000,000 | Quadrillion | Internet-scale estimation        | PB = 10^15 bytes  |
 
-## Example
+## Examples
 
 - 1K = 1 thousand
 - 1M = 1 million
 - 1B = 1 billion
 - 1TB = 1 trillion bytes (approx.)
+
+## Data Size Reference for Database Storage Analysis
+
+Use this table for rough estimation when calculating how much space common data types may take in a database.
+
+| Data Type                | Approximate Size | Example Usage                  | Notes                                                                             |
+|--------------------------|------------------|--------------------------------|-----------------------------------------------------------------------------------|
+| `CHAR(1)` / character    | 1-2 bytes        | Gender, status flag, code      | Depends on encoding such as ASCII or UTF-8/UTF-16.                                |
+| `SMALLINT`               | 2 bytes          | Small counters, short codes    | Good for small numeric ranges.                                                    |
+| `INTEGER`                | 4 bytes          | User ID, quantity, count       | Common integer type in databases.                                                 |
+| `BIGINT` / `LONG`        | 8 bytes          | Large IDs, timestamps          | Used for large numeric values.                                                    |
+| `FLOAT`                  | 4 bytes          | Approximate decimal values     | May lose precision.                                                               |
+| `DOUBLE`                 | 8 bytes          | Ratings, measurements          | Better precision than float.                                                      |
+| `BOOLEAN`                | 1 byte           | Active/inactive, true/false    | Actual storage may vary by database.                                              |
+| `DATE`                   | 3-4 bytes        | Birth date, created date       | Depends on database engine.                                                       |
+| `DATETIME` / `TIMESTAMP` | 8 bytes          | Created time, updated time     | Common for audit fields.                                                          |
+| Short text               | 20-100 bytes     | Name, city, title              | Depends on actual text length.                                                    |
+| Long text                | 1 KB+            | Description, comments, article | Often stored as `TEXT` or similar types.                                          |
+| Average image            | 300 KB           | Profile photo, product image   | Usually better stored in object storage, with only the URL saved in the database. |
+
+### Quick Storage Estimation Tips
+
+- Add the size of all fields in one row to estimate row size.
+- Multiply row size by the number of records to estimate total table size.
+- Add extra space for indexes, metadata, and replication.
+- For images, videos, and files, prefer object storage and save only the file path or URL in the database.
+
+## Estimating Servers, RAM, Storage, and Bandwidth
+
+After estimating traffic and data size, analyze the following system requirements:
+
+- **Number of servers**: How many application servers are needed to handle peak traffic.
+- **RAM**: How much memory is needed for application processing, caching, and database operations.
+- **Storage**: How much disk or object storage is required for user data, logs, media, and backups.
+- **Bandwidth**: How much network throughput is required for incoming and outgoing traffic.
+- **Trade-offs (CAP)**: Decide whether the system should prioritize Consistency, Availability, or Partition Tolerance.
+
+### Traffic and Storage Formula
+
+Use a simple formula for rough storage estimation:
+
+`Total Storage = Number of Users × Average Data per User`
+
+### Storage Calculation Examples
+
+| Scenario           | Formula                                             | Result         |
+|--------------------|-----------------------------------------------------|----------------|
+| User data storage  | 2 million (6 zero) users x `y` MB (6 zero) per user | `2y` TB        |
+| Small profile data | 5 million (6 zero) users x 2 KB (3 zero) per user   | 10 GB (9 zero) |
+
+### Quick Analysis Table
+
+| Resource      | What to Estimate                            | Example Consideration                                              |
+|---------------|---------------------------------------------|--------------------------------------------------------------------|
+| Servers       | Requests per second, concurrency, CPU load  | 3-10 app servers for moderate traffic                              |
+| RAM           | Cache size, active sessions, query workload | 16-64 GB depending on workload                                     |
+| Storage       | User data, images, logs, backups            | 10 GB to multiple TB                                               |
+| Bandwidth     | Request size x traffic volume               | Depends on API, media, and CDN usage                               |
+| CAP Trade-off | Consistency vs availability                 | Banking prefers consistency; social apps often prefer availability |
+
+### Notes
+
+- Always estimate for peak traffic, not only average traffic.
+- Add extra capacity for replication, backups, and future growth.
+- For images and videos, use object storage instead of storing large files directly in the database.
 
